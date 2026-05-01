@@ -6,12 +6,23 @@ const emailService = require('../config/emailService');
 const OTP_EXPIRATION_MINUTES = 15;
 const REFRESH_TOKEN_EXPIRATION_DAYS = 7;
 const RESET_TOKEN_EXPIRATION = '30m';
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 const getOtpExpirationDate = () => new Date(Date.now() + OTP_EXPIRATION_MINUTES * 60 * 1000);
 
 const resolveUserId = (user) => user.id_usuario || user.id;
+
+const findMissingFields = (payload, fields) => fields.filter((field) => {
+  const value = payload[field];
+
+  if (typeof value === 'boolean') {
+    return false;
+  }
+
+  return value === undefined || value === null || String(value).trim() === '';
+});
 
 const findUserByEmail = async (email) => {
   const [users] = await db.query('SELECT * FROM usuarios WHERE email = ?', [email]);
@@ -44,6 +55,11 @@ const resolveUserRole = async (userId, defaultRole) => {
   }
 
   return defaultRole || 'usuario';
+};
+
+const generateSocialPassword = async (provider, email) => {
+  const rawPassword = `${provider}:${email}:${Date.now()}`;
+  return bcrypt.hash(rawPassword, 10);
 };
 
 const createTokens = (userId, email, role) => {
@@ -151,6 +167,19 @@ const resetPassword = async (req, res) => {
 const registerCitizen = async (req, res) => {
   const { nombre, apellido, email, password, provincia, ciudad, zona } = req.body;
 
+  const missingFields = findMissingFields(req.body, ['nombre', 'apellido', 'email', 'password', 'provincia', 'ciudad', 'zona']);
+  if (missingFields.length > 0) {
+    return res.status(400).json({ error: `Faltan campos requeridos: ${missingFields.join(', ')}` });
+  }
+
+  if (!emailRegex.test(String(email).trim())) {
+    return res.status(400).json({ error: 'El email no tiene un formato válido' });
+  }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+  }
+
   try {
     const existingUser = await findUserByEmail(email);
     if (existingUser) {
@@ -191,6 +220,19 @@ const registerCitizen = async (req, res) => {
 
 const registerInstitution = async (req, res) => {
   const { contactName, email, password, institutionName, cuit, institutionType, phone, provincia, ciudad, zona, address } = req.body;
+
+  const missingFields = findMissingFields(req.body, ['contactName', 'email', 'password', 'institutionName', 'cuit', 'institutionType', 'phone', 'provincia', 'ciudad', 'zona', 'address']);
+  if (missingFields.length > 0) {
+    return res.status(400).json({ error: `Faltan campos requeridos: ${missingFields.join(', ')}` });
+  }
+
+  if (!emailRegex.test(String(email).trim())) {
+    return res.status(400).json({ error: 'El email no tiene un formato válido' });
+  }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+  }
 
   try {
     const existingUser = await findUserByEmail(email);
@@ -351,6 +393,73 @@ const login = async (req, res) => {
   }
 };
 
+const socialLogin = async (req, res) => {
+  const { email, provider, name } = req.body;
+
+  if (!email || !provider) {
+    return res.status(400).json({ error: 'Email y provider son requeridos' });
+  }
+
+  try {
+    let user = await findUserByEmail(email);
+
+    if (!user) {
+      const hashedPassword = await generateSocialPassword(provider, email);
+      const [result] = await db.query(
+        `INSERT INTO usuarios (email, password, email_verified, verification_code, verification_expires, auth_provider, activo, tipo_usuario)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [email, hashedPassword, true, null, null, provider, true, 'usuario']
+      );
+
+      user = {
+        id_usuario: result.insertId,
+        email,
+        activo: true,
+        email_verified: true,
+        tipo_usuario: 'usuario',
+      };
+    } else {
+      const userId = resolveUserId(user);
+      await db.query(
+        `UPDATE usuarios
+         SET email_verified = ?, auth_provider = COALESCE(auth_provider, ?), activo = ?
+         WHERE id_usuario = ?`,
+        [true, provider, true, userId]
+      );
+
+      user = {
+        ...user,
+        id_usuario: userId,
+        email_verified: true,
+        activo: true,
+        tipo_usuario: user.tipo_usuario || 'usuario',
+      };
+    }
+
+    const userId = resolveUserId(user);
+    const userType = await resolveUserRole(userId, user.tipo_usuario || 'usuario');
+    const { accessToken, refreshToken } = createTokens(userId, email, userType);
+
+    await saveRefreshToken(refreshToken, userId, userType);
+
+    return res.status(200).json({
+      message: 'Login social exitoso',
+      accessToken,
+      refreshToken,
+      user: {
+        id: userId,
+        email,
+        name: name || email,
+        role: userType,
+        email_verified: true,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Error en el servidor al iniciar sesión con proveedor externo' });
+  }
+};
+
 const refreshToken = async (req, res) => {
   const { token } = req.body;
   if (!token) {
@@ -411,6 +520,7 @@ module.exports = {
   forgotPassword,
   resetPassword,
   login,
+  socialLogin,
   refreshToken,
   logout,
 };
