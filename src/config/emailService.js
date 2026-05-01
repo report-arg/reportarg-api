@@ -1,13 +1,37 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const parseBoolean = (value, defaultValue = false) => {
+  if (typeof value !== 'string') return defaultValue;
+  return value.toLowerCase() === 'true';
+};
+
+const createTransportConfig = () => {
+  const hasSmtpConfig = !!(process.env.SMTP_HOST && process.env.SMTP_PORT);
+
+  if (hasSmtpConfig) {
+    return {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT, 10),
+      secure: parseBoolean(process.env.SMTP_SECURE, false),
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    };
+  }
+
+  // Fallback para desarrollo local con Gmail
+  return {
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  };
+};
+
+const transporter = nodemailer.createTransport(createTransportConfig());
 
 // Verificar conexión al iniciar
 transporter.verify((err, success) => {
@@ -117,6 +141,30 @@ const emailService = {
           <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" style="display: inline-block; margin: 24px 0; padding: 12px 28px; background: #2D3A8C; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px;">
             Ingresar a ReportARG
           </a>
+          <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;" />
+          <p style="color: #aaa; font-size: 11px;">ReportARG — Sistema de Reportes Ciudadanos</p>
+        </div>
+      `,
+    });
+  },
+
+  async enviarRecuperacionPassword(email, token) {
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${encodeURIComponent(token)}`;
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: 'Recuperar contraseña en ReportARG',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <h2 style="color: #2D3A8C; margin-bottom: 8px;">Recuperación de contraseña</h2>
+          <p style="color: #666; font-size: 14px;">Recibimos una solicitud para restablecer tu contraseña.</p>
+          <p style="color: #666; font-size: 14px;">Haz click en el botón para continuar:</p>
+          <a href="${resetUrl}" style="display: inline-block; margin: 24px 0; padding: 12px 28px; background: #2D3A8C; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px;">
+            Restablecer contraseña
+          </a>
+          <p style="color: #aaa; font-size: 12px;">Si no solicitaste este cambio, puedes ignorar este correo.</p>
+          <p style="color: #aaa; font-size: 12px;">Este enlace expira en 30 minutos.</p>
           <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;" />
           <p style="color: #aaa; font-size: 11px;">ReportARG — Sistema de Reportes Ciudadanos</p>
         </div>
