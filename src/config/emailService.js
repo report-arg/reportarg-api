@@ -20,6 +20,27 @@ transporter.verify((err, success) => {
 
 const emailService = {
 
+  async enviarCodigoVerificacion(email, code) {
+    await transporter.sendMail({
+      from:    process.env.EMAIL_FROM,
+      to:      email,
+      subject: 'Tu código de verificación en ReportARG',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <h2 style="color: #2D3A8C; margin-bottom: 8px;">Código de Verificación</h2>
+          <p style="color: #666; font-size: 14px;">Utilizá el siguiente código de 6 dígitos para verificar tu cuenta en ReportARG.</p>
+          <div style="background: #f4f4f4; border: 1px solid #ddd; padding: 16px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 24px 0; border-radius: 8px;">
+            ${code}
+          </div>
+          <p style="color: #aaa; font-size: 12px;">Si no solicitaste este código, ignorá este mensaje.</p>
+          <p style="color: #aaa; font-size: 12px;">Este código expira en 15 minutos.</p>
+          <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;" />
+          <p style="color: #aaa; font-size: 11px;">ReportARG — Sistema de Reportes Ciudadanos</p>
+        </div>
+      `,
+    });
+  },
+
   async enviarConfirmacion(email, token) {
     const url = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
 
