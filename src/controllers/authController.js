@@ -91,12 +91,23 @@ const saveRefreshToken = async (refreshToken, userId, userType) => {
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
-  try {
-    const user = await findUserByEmail(email);
+  if (!email || !String(email).trim()) {
+    return res.status(400).json({ error: 'El correo electrónico es requerido' });
+  }
 
-    // Respuesta genérica para no exponer si el email existe o no.
-    if (!user || !user.activo) {
-      return res.status(200).json({ message: 'Si el correo existe, recibirás un enlace para restablecer la contraseña.' });
+  if (!emailRegex.test(String(email).trim())) {
+    return res.status(400).json({ error: 'El correo electrónico no tiene un formato válido' });
+  }
+
+  try {
+    const user = await findUserByEmail(String(email).trim());
+
+    if (!user) {
+      return res.status(404).json({ error: 'No existe una cuenta registrada con ese correo' });
+    }
+
+    if (!user.activo) {
+      return res.status(403).json({ error: 'La cuenta está deshabilitada' });
     }
 
     const resetSecret = process.env.JWT_RESET_SECRET || process.env.JWT_SECRET;
@@ -112,7 +123,7 @@ const forgotPassword = async (req, res) => {
 
     await emailService.enviarRecuperacionPassword(user.email, token);
 
-    return res.status(200).json({ message: 'Si el correo existe, recibirás un enlace para restablecer la contraseña.' });
+    return res.status(200).json({ message: 'Te enviamos un enlace para restablecer tu contraseña.' });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Error en el servidor al solicitar recuperación de contraseña' });
