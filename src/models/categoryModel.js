@@ -3,48 +3,44 @@ const db = require('../config/db');
 const CategoryModel = {
 
   async getAll() {
-  const [rows] = await db.query(`
-    SELECT id_categoria AS id, nombre, descripcion
-    FROM categorias
-    ORDER BY nombre ASC
-  `);
-  return rows;
+    const [rows] = await db.query(`
+      SELECT id_categoria AS id, codigo, nombre, descripcion, tipo, estado, orden
+      FROM categorias
+      ORDER BY orden ASC
+    `);
+    return rows;
   },
 
   async getById(id) {
     const [rows] = await db.query(`
-      SELECT id_categoria AS id, nombre, descripcion
+      SELECT id_categoria AS id, codigo, nombre, descripcion, tipo, estado, orden
       FROM categorias
       WHERE id_categoria = ?
     `, [id]);
     return rows[0] || null;
   },
 
-  async create({ nombre, descripcion }) {
+  async create({ codigo, nombre, descripcion, tipo, estado = 'activo', orden = 0 }) {
     const [result] = await db.query(`
-      INSERT INTO categorias (nombre, descripcion)
-      VALUES (?, ?)
-    `, [nombre, descripcion]);
+      INSERT INTO categorias (codigo, nombre, descripcion, tipo, estado, orden)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [codigo, nombre, descripcion, tipo, estado, orden]);
     return result.insertId;
   },
 
-  async update(id, { nombre, descripcion }) {
+  async update(id, { nombre, descripcion, tipo, estado, orden }) {
     const [result] = await db.query(`
-      UPDATE categorias SET nombre = ?, descripcion = ?
+      UPDATE categorias 
+      SET nombre = ?, descripcion = ?, tipo = ?, estado = ?, orden = ?
       WHERE id_categoria = ?
-    `, [nombre, descripcion, id]);
+    `, [nombre, descripcion, tipo, estado, orden, id]);
     return result.affectedRows;
   },
 
-  async delete(id) {
-    const [reclamos] = await db.query(`
-      SELECT COUNT(*) AS total FROM reclamos WHERE id_categoria = ?
-    `, [id]);
-    if (reclamos[0].total > 0) {
-      throw new Error('No se puede eliminar una categoría con reclamos asociados');
-    }
+  async bajaLogica(id) {
     const [result] = await db.query(`
-      DELETE FROM categorias WHERE id_categoria = ?
+      UPDATE categorias SET estado = 'inactivo'
+      WHERE id_categoria = ?
     `, [id]);
     return result.affectedRows;
   },
@@ -59,6 +55,18 @@ const CategoryModel = {
     const [rows] = await db.query(query, params);
     return rows.length > 0;
   },
+
+  async codigoExiste(codigo, excludeId = null) {
+    let query = `SELECT id_categoria FROM categorias WHERE codigo = ?`;
+    const params = [codigo];
+    if (excludeId) {
+      query += ` AND id_categoria != ?`;
+      params.push(excludeId);
+    }
+    const [rows] = await db.query(query, params);
+    return rows.length > 0;
+  },
+
 };
 
 module.exports = CategoryModel;
