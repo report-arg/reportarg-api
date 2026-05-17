@@ -56,14 +56,45 @@ const UserModel = {
         ) AS nombre,
         c.nombre AS nombre_ciudadano,
         c.apellido,
+        c.provincia,
+        c.ciudad,
         c.zona,
-        COALESCE(c.foto_perfil, i.foto_perfil) AS foto
+        COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
+        (SELECT COUNT(*) FROM reclamos r WHERE r.id_usuario = u.id_usuario) AS reportes
       FROM usuarios u
       LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
       LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
       WHERE u.id_usuario = ?
     `, [id]);
     return rows[0] || null;
+  },
+
+  // Actualizar perfil propio (nombre, email, ubicación, foto)
+  async updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto }) {
+    if (email) {
+      await db.query('UPDATE usuarios SET email = ? WHERE id_usuario = ?', [email, id]);
+    }
+    await db.query(`
+      UPDATE ciudadanos
+      SET nombre    = COALESCE(?, nombre),
+          apellido  = COALESCE(?, apellido),
+          provincia = COALESCE(?, provincia),
+          ciudad    = COALESCE(?, ciudad),
+          zona      = COALESCE(?, zona),
+          foto_perfil = COALESCE(?, foto_perfil)
+      WHERE id_usuario = ?
+    `, [nombre || null, apellido || null, provincia || null, ciudad || null, zona || null, foto || null, id]);
+  },
+
+  // Cambiar contraseña verificando la actual
+  async cambiarPassword(id, passwordActual, passwordNueva) {
+    const bcrypt = require('bcryptjs');
+    const [[user]] = await db.query('SELECT password FROM usuarios WHERE id_usuario = ?', [id]);
+    if (!user) throw new Error('Usuario no encontrado');
+    const coincide = await bcrypt.compare(passwordActual, user.password);
+    if (!coincide) throw new Error('La contraseña actual es incorrecta');
+    const hash = await bcrypt.hash(passwordNueva, 10);
+    await db.query('UPDATE usuarios SET password = ? WHERE id_usuario = ?', [hash, id]);
   },
 
   // Crear usuario

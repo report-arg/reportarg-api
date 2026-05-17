@@ -387,6 +387,16 @@ const login = async (req, res) => {
 
     await saveRefreshToken(refreshToken, userId, userType);
 
+    // Obtener nombre completo del ciudadano o institución
+    const [[perfilRow]] = await db.query(`
+      SELECT COALESCE(CONCAT(c.nombre, ' ', c.apellido), i.nombre) AS nombre,
+             COALESCE(c.foto_perfil, i.foto_perfil) AS foto
+      FROM usuarios u
+      LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
+      LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
+      WHERE u.id_usuario = ?
+    `, [userId]);
+
     return res.status(200).json({
       message: 'Login exitoso',
       accessToken,
@@ -395,6 +405,8 @@ const login = async (req, res) => {
         id: userId,
         email: user.email,
         role: userType,
+        nombre: perfilRow?.nombre || null,
+        foto: perfilRow?.foto || null,
         email_verified: user.email_verified,
       },
     });
@@ -523,6 +535,18 @@ const logout = async (req, res) => {
   }
 };
 
+const me = async (req, res) => {
+  try {
+    const UserModel = require('../models/userModel');
+    const usuario = await UserModel.getById(req.user.id);
+    if (!usuario) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+    return res.json({ ok: true, data: usuario });
+  } catch (error) {
+    console.error('Error en /me:', error);
+    return res.status(500).json({ ok: false, error: 'Error al obtener perfil' });
+  }
+};
+
 module.exports = {
   registerCitizen,
   registerInstitution,
@@ -534,4 +558,5 @@ module.exports = {
   socialLogin,
   refreshToken,
   logout,
+  me,
 };
