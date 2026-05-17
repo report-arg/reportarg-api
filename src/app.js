@@ -48,6 +48,12 @@ app.use('/api/admin/upload', uploadRoutes);
 
 const PORT = process.env.PORT || 3001;
 
+// Error handler global — devuelve JSON en vez de HTML
+app.use((err, req, res, next) => {
+  console.error('Error no manejado:', err.message);
+  res.status(err.status || 500).json({ ok: false, mensaje: err.message || 'Error interno del servidor' });
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const { verifyToken } = require('../middlewares/authMiddleware');
+
+router.get('/me', verifyToken, authController.me);
 
 router.post('/register-citizen', authController.registerCitizen);
 router.post('/register-institution', authController.registerInstitution);

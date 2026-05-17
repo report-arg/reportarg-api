@@ -156,6 +156,43 @@ const userController = {
       res.status(500).json({ ok: false, mensaje: 'Error al obtener estadísticas' });
     }
   },
+
+  async actualizarPerfil(req, res) {
+    try {
+      const { nombre, apellido, email, provincia, ciudad, zona, foto } = req.body;
+      const { id } = req.params;
+
+      if (email) {
+        const existe = await UserModel.emailExiste(email, id);
+        if (existe) return res.status(409).json({ ok: false, mensaje: 'El email ya está en uso' });
+      }
+
+      await UserModel.updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto });
+      res.json({ ok: true, mensaje: 'Perfil actualizado correctamente' });
+    } catch (err) {
+      console.error('Error actualizar perfil:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error al actualizar el perfil' });
+    }
+  },
+
+  async cambiarPassword(req, res) {
+    try {
+      const { passwordActual, passwordNueva } = req.body;
+      const { id } = req.params;
+
+      if (!passwordActual || !passwordNueva)
+        return res.status(400).json({ ok: false, mensaje: 'Ambas contraseñas son requeridas' });
+      if (passwordNueva.length < 8)
+        return res.status(400).json({ ok: false, mensaje: 'La nueva contraseña debe tener al menos 8 caracteres' });
+
+      await UserModel.cambiarPassword(id, passwordActual, passwordNueva);
+      res.json({ ok: true, mensaje: 'Contraseña actualizada correctamente' });
+    } catch (err) {
+      console.error('Error cambiar password:', err);
+      const status = err.message === 'La contraseña actual es incorrecta' ? 400 : 500;
+      res.status(status).json({ ok: false, mensaje: err.message });
+    }
+  },
 };
 
 module.exports = userController;
