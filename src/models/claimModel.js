@@ -62,6 +62,97 @@ const ClaimModel = {
     `);
     return rows;
   },
+
+  async crear({ titulo, descripcion, id_categoria, id_usuario, direccion }) {
+    const [result] = await db.query(
+      `INSERT INTO reclamos (titulo, descripcion, id_categoria, id_usuario, direccion, estado, fecha_creacion)
+       VALUES (?, ?, ?, ?, ?, 'recibido', NOW())`,
+      [titulo || null, descripcion || null, id_categoria, id_usuario, direccion || null]
+    );
+    return result.insertId;
+  },
+
+  async getByUsuario(idUsuario) {
+    const [rows] = await db.query(`
+      SELECT
+        r.id_reclamo     AS id,
+        r.titulo,
+        r.descripcion,
+        r.estado,
+        r.direccion,
+        r.fecha_creacion,
+        c.nombre         AS categoriaNombre
+      FROM reclamos r
+      LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
+      WHERE r.id_usuario = ?
+      ORDER BY r.fecha_creacion DESC
+    `, [idUsuario]);
+    return rows;
+  },
+
+  async getLista({ estado = null, pagina = 1, limite = 20 } = {}) {
+    const offset = (pagina - 1) * limite;
+    const params = [];
+    let where = 'WHERE 1=1';
+    if (estado) { where += ' AND r.estado = ?'; params.push(estado); }
+
+    const [rows] = await db.query(`
+      SELECT
+        r.id_reclamo     AS id,
+        r.titulo,
+        r.estado,
+        r.direccion,
+        r.fecha_creacion,
+        c.nombre         AS categoriaNombre,
+        COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), inst.nombre, u.email) AS autorNombre
+      FROM reclamos r
+      LEFT JOIN categorias   c    ON c.id_categoria  = r.id_categoria
+      LEFT JOIN usuarios     u    ON u.id_usuario    = r.id_usuario
+      LEFT JOIN ciudadanos   ci   ON ci.id_usuario   = r.id_usuario
+      LEFT JOIN instituciones inst ON inst.id_usuario = r.id_usuario
+      ${where}
+      ORDER BY r.fecha_creacion DESC
+      LIMIT ? OFFSET ?
+    `, [...params, limite, offset]);
+
+    const [[{ total }]] = await db.query(
+      `SELECT COUNT(*) AS total FROM reclamos r ${where}`, params
+    );
+    return { rows, total };
+  },
+
+  async getById(id) {
+    const [rows] = await db.query(`
+      SELECT
+        r.id_reclamo     AS id,
+        r.titulo,
+        r.descripcion,
+        r.estado,
+        r.direccion,
+        r.fecha_creacion,
+        r.id_usuario,
+        c.id_categoria   AS categoriaId,
+        c.nombre         AS categoriaNombre,
+        c.descripcion    AS categoriaDesc,
+        COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), inst.nombre, u.email) AS autorNombre,
+        u.email          AS autorEmail
+      FROM reclamos r
+      LEFT JOIN categorias   c    ON c.id_categoria  = r.id_categoria
+      LEFT JOIN usuarios     u    ON u.id_usuario    = r.id_usuario
+      LEFT JOIN ciudadanos   ci   ON ci.id_usuario   = r.id_usuario
+      LEFT JOIN instituciones inst ON inst.id_usuario = r.id_usuario
+      WHERE r.id_reclamo = ?
+    `, [id]);
+    return rows[0] || null;
+  },
+
+  async updateEstado(id, estado) {
+    const [result] = await db.query(
+      `UPDATE reclamos SET estado = ? WHERE id_reclamo = ?`,
+      [estado, id]
+    );
+    return result.affectedRows;
+  },
 };
 
 module.exports = ClaimModel;

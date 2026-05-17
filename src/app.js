@@ -46,6 +46,14 @@ app.use('/api/admin/notificaciones', notificationRoutes);
 const uploadRoutes = require('./routes/admin/uploadRoutes');
 app.use('/api/admin/upload', uploadRoutes);
 
+//feedRoutes (público)
+const feedRoutes = require('./routes/feedRoutes');
+app.use('/api/feed', feedRoutes);
+
+//reclamoRoutes (ciudadano)
+const reclamoRoutes = require('./routes/reclamoRoutes');
+app.use('/api/reclamos', reclamoRoutes);
+
 const PORT = process.env.PORT || 3001;
 
 // Error handler global — devuelve JSON en vez de HTML

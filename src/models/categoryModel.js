@@ -67,6 +67,16 @@ const CategoryModel = {
     return rows.length > 0;
   },
 
+  async getParaReclamo() {
+    const [rows] = await db.query(`
+      SELECT id_categoria AS id, nombre, descripcion, tipo, orden
+      FROM categorias
+      WHERE estado = 'activo' AND tipo IN ('reclamo', 'ambos')
+      ORDER BY orden ASC
+    `);
+    return rows;
+  },
+
 };
 
 module.exports = CategoryModel;
