@@ -54,6 +54,14 @@ app.use('/api/feed', feedRoutes);
 const reclamoRoutes = require('./routes/reclamoRoutes');
 app.use('/api/reclamos', reclamoRoutes);
 
+//comunicadoRoutes (institución)
+const comunicadoRoutes = require('./routes/comunicadoRoutes');
+app.use('/api/comunicados', comunicadoRoutes);
+
+//comentarioRoutes
+const comentarioRoutes = require('./routes/comentarioRoutes');
+app.use('/api/comentarios', comentarioRoutes);
+
 const PORT = process.env.PORT || 3001;
 
 // Error handler global — devuelve JSON en vez de HTML

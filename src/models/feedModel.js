@@ -21,6 +21,7 @@ const FeedModel = {
     const [items] = await db.query(`
       SELECT
         r.id_reclamo                                    AS id,
+        r.id_usuario,
         r.titulo,
         r.descripcion,
         r.estado,
@@ -32,7 +33,9 @@ const FeedModel = {
         COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), inst.nombre) AS autorNombre,
         COALESCE(ci.foto_perfil, inst.foto_perfil)      AS autorFoto,
         CASE WHEN inst.id_usuario IS NOT NULL THEN 1 ELSE 0 END AS esInstitucion,
-        COALESCE(inst.verificada, 0)                    AS verificada
+        COALESCE(inst.verificada, 0)                    AS verificada,
+        r.imagen                                          AS imagen,
+        CAST((SELECT COUNT(*) FROM comentarios WHERE id_reclamo = r.id_reclamo) AS UNSIGNED) AS cantidadComentarios
       FROM reclamos r
       LEFT JOIN categorias c       ON c.id_categoria   = r.id_categoria
       LEFT JOIN usuarios u         ON u.id_usuario     = r.id_usuario
@@ -59,13 +62,17 @@ const FeedModel = {
       SELECT
         c.id_categoria AS id,
         c.nombre,
-        COUNT(r.id_reclamo) AS cantidad
+        SUM(CASE WHEN inst.id_usuario IS NULL     THEN 1 ELSE 0 END) AS reclamos,
+        SUM(CASE WHEN inst.id_usuario IS NOT NULL THEN 1 ELSE 0 END) AS comunicados,
+        COUNT(r.id_reclamo) AS total
       FROM categorias c
-      LEFT JOIN reclamos r ON r.id_categoria = c.id_categoria
+      LEFT JOIN reclamos r       ON r.id_categoria  = c.id_categoria
         AND r.estado != 'rechazado'
+      LEFT JOIN instituciones inst ON inst.id_usuario = r.id_usuario
       WHERE c.estado = 'activo'
       GROUP BY c.id_categoria, c.nombre
-      ORDER BY cantidad DESC
+      HAVING total > 0
+      ORDER BY total DESC
       LIMIT 5
     `);
     return rows;

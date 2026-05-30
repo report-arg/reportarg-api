@@ -77,6 +77,16 @@ const CategoryModel = {
     return rows;
   },
 
+  async getParaComunicado() {
+    const [rows] = await db.query(`
+      SELECT id_categoria AS id, nombre, descripcion, tipo, orden
+      FROM categorias
+      WHERE estado = 'activo' AND tipo IN ('comunicado', 'ambos')
+      ORDER BY orden ASC
+    `);
+    return rows;
+  },
+
 };
 
 module.exports = CategoryModel;
