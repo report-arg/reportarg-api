@@ -63,11 +63,11 @@ const ClaimModel = {
     return rows;
   },
 
-  async crear({ titulo, descripcion, id_categoria, id_usuario, direccion }) {
+  async crear({ titulo, descripcion, id_categoria, id_usuario, direccion, latitud, longitud }) {
     const [result] = await db.query(
-      `INSERT INTO reclamos (titulo, descripcion, id_categoria, id_usuario, direccion, estado, fecha_creacion)
-       VALUES (?, ?, ?, ?, ?, 'recibido', NOW())`,
-      [titulo || null, descripcion || null, id_categoria, id_usuario, direccion || null]
+      `INSERT INTO reclamos (titulo, descripcion, id_categoria, id_usuario, direccion, latitud, longitud, estado, fecha_creacion)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'recibido', NOW())`,
+      [titulo || null, descripcion || null, id_categoria, id_usuario, direccion || null, latitud || null, longitud || null]
     );
     return result.insertId;
   },
@@ -152,6 +152,62 @@ const ClaimModel = {
       [estado, id]
     );
     return result.affectedRows;
+  },
+
+  async getParaMapa() {
+    const [rows] = await db.query(`
+      SELECT
+        r.id_reclamo AS id,
+        r.titulo,
+        r.estado,
+        r.direccion,
+        r.latitud,
+        r.longitud,
+        c.nombre AS categoriaNombre
+      FROM reclamos r
+      LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
+      WHERE r.latitud IS NOT NULL AND r.longitud IS NOT NULL
+      ORDER BY r.fecha_creacion DESC
+    `);
+    return rows;
+  },
+
+  async crearComunicado({ titulo, descripcion, id_categoria, id_usuario, imagen = null, estado = 'publicado' }) {
+    const [result] = await db.query(
+      `INSERT INTO reclamos (titulo, descripcion, imagen, id_categoria, id_usuario, estado, fecha_creacion)
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+      [titulo || null, descripcion || null, imagen || null, id_categoria, id_usuario, estado]
+    );
+    return result.insertId;
+  },
+
+  async eliminarComunicado(idReclamo, idUsuario) {
+    const [result] = await db.query(
+      `DELETE FROM reclamos WHERE id_reclamo = ? AND id_usuario = ?
+       AND id_usuario IN (SELECT id_usuario FROM instituciones WHERE id_usuario = ?)`,
+      [idReclamo, idUsuario, idUsuario]
+    );
+    return result.affectedRows;
+  },
+
+  async getComunicadosByInstitucion(idUsuario) {
+    const [rows] = await db.query(`
+      SELECT
+        r.id_reclamo     AS id,
+        r.titulo,
+        r.descripcion,
+        r.estado,
+        r.fecha_creacion,
+        c.id_categoria   AS categoriaId,
+        c.nombre         AS categoriaNombre,
+        c.tipo           AS categoriaTipo
+      FROM reclamos r
+      LEFT JOIN categorias    c    ON c.id_categoria  = r.id_categoria
+      INNER JOIN instituciones inst ON inst.id_usuario = r.id_usuario
+      WHERE r.id_usuario = ?
+      ORDER BY r.fecha_creacion DESC
+    `, [idUsuario]);
+    return rows;
   },
 };
 
