@@ -20,12 +20,22 @@ const CategoryModel = {
     return rows[0] || null;
   },
 
-  async create({ codigo, nombre, descripcion, tipo, estado = 'activo', orden = 0 }) {
+  async generarCodigo() {
+    const [rows] = await db.query(`
+      SELECT id_categoria FROM categorias ORDER BY id_categoria DESC LIMIT 1
+    `);
+    if (rows.length === 0) return 'CAT-001';
+    const ultimoId = rows[0].id_categoria + 1
+    return `CAT-${String(ultimoId).padStart(3, '0')}`;
+},
+
+  async create({ nombre, descripcion, tipo, estado = 'activo', orden = 0 }) {
+    const codigo = await this.generarCodigo();
     const [result] = await db.query(`
       INSERT INTO categorias (codigo, nombre, descripcion, tipo, estado, orden)
       VALUES (?, ?, ?, ?, ?, ?)
     `, [codigo, nombre, descripcion, tipo, estado, orden]);
-    return result.insertId;
+    return { id: result.insertId, codigo };
   },
 
   async update(id, { nombre, descripcion, tipo, estado, orden }) {
