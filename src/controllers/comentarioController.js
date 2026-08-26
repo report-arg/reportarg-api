@@ -5,6 +5,7 @@ const comentarioController = {
   /**
    * GET /api/comentarios/:idReclamo
    * Devuelve todos los comentarios de un reclamo/comunicado.
+   * 
    */
   async listar(req, res) {
     try {

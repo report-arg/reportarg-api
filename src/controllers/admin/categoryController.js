@@ -25,10 +25,9 @@ const categoryController = {
 
   async crear(req, res) {
     try {
-      const { codigo, nombre, descripcion, tipo, estado, orden } = req.body;
+      const { nombre, descripcion, tipo, estado, orden } = req.body;
 
       // Validaciones obligatorias
-      if (!codigo?.trim()) return res.status(400).json({ ok: false, mensaje: 'El código es obligatorio' });
       if (!nombre?.trim()) return res.status(400).json({ ok: false, mensaje: 'El nombre es obligatorio' });
       if (!tipo) return res.status(400).json({ ok: false, mensaje: 'El tipo es obligatorio' });
       if (!['reclamo', 'comunicado', 'ambos'].includes(tipo)) {
@@ -36,14 +35,10 @@ const categoryController = {
       }
 
       // Validaciones de unicidad
-      const codigoExiste = await CategoryModel.codigoExiste(codigo.trim().toUpperCase());
-      if (codigoExiste) return res.status(409).json({ ok: false, mensaje: 'Ya existe una categoría con ese código' });
-
       const nombreExiste = await CategoryModel.nombreExiste(nombre.trim());
       if (nombreExiste) return res.status(409).json({ ok: false, mensaje: 'Ya existe una categoría con ese nombre' });
 
-      const id = await CategoryModel.create({
-        codigo: codigo.trim().toUpperCase(),
+      const {id, codigo} = await CategoryModel.create({
         nombre: nombre.trim(),
         descripcion: descripcion?.trim() || null,
         tipo,
@@ -51,7 +46,7 @@ const categoryController = {
         orden: orden ?? 0,
       });
 
-      res.status(201).json({ ok: true, mensaje: 'Categoría creada correctamente', id });
+      res.status(201).json({ ok: true, mensaje: 'Categoría creada correctamente', id, codigo });
     } catch (err) {
       console.error('Error crear categoria:', err);
       res.status(500).json({ ok: false, mensaje: 'Error al crear categoría' });
