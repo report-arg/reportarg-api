@@ -32,6 +32,15 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+const requireRole = (...allowedRoles) => (req, res, next) => {
+    const role = normalizeRole(req.user?.role);
+    if (!allowedRoles.map(normalizeRole).includes(role)) {
+        return res.status(403).json({ error: 'No tenés permisos para realizar esta acción.' });
+    }
+    next();
+};
+
 module.exports = {
-  verifyToken,
+    verifyToken,
+    requireRole,
 };

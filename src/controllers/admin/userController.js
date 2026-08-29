@@ -160,7 +160,7 @@ const userController = {
   async actualizarPerfil(req, res) {
     try {
       const { nombre, apellido, email, provincia, ciudad, zona, foto } = req.body;
-      const { id } = req.params;
+      const id = req.params.id || req.user.id;
 
       if (email) {
         const existe = await UserModel.emailExiste(email, id);
@@ -178,7 +178,7 @@ const userController = {
   async cambiarPassword(req, res) {
     try {
       const { passwordActual, passwordNueva } = req.body;
-      const { id } = req.params;
+      const id = req.params.id || req.user.id;
 
       if (!passwordActual || !passwordNueva)
         return res.status(400).json({ ok: false, mensaje: 'Ambas contraseñas son requeridas' });

@@ -21,13 +21,14 @@ const comentarioController = {
   /**
    * POST /api/comentarios
    * Crea un nuevo comentario.
-   * Body: { id_reclamo, id_usuario, texto }
+   * Body: { id_reclamo, texto }
    */
   async crear(req, res) {
     try {
-      const { id_reclamo, id_usuario, texto } = req.body;
+      const { id_reclamo, texto } = req.body;
+      const id_usuario = req.user.id;
 
-      if (!id_reclamo || !id_usuario)
+      if (!id_reclamo)
         return res.status(400).json({ ok: false, mensaje: 'Faltan datos obligatorios' });
 
       if (!texto || !texto.trim())
@@ -52,12 +53,7 @@ const comentarioController = {
   async eliminar(req, res) {
     try {
       const { id } = req.params;
-      const { id_usuario } = req.body;
-
-      if (!id_usuario)
-        return res.status(400).json({ ok: false, mensaje: 'Falta id_usuario' });
-
-      const afectados = await ComentarioModel.eliminar(Number(id), Number(id_usuario));
+      const afectados = await ComentarioModel.eliminar(Number(id), Number(req.user.id));
       if (!afectados)
         return res.status(403).json({ ok: false, mensaje: 'No autorizado o comentario inexistente' });
 
