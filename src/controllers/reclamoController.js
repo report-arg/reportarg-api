@@ -1,6 +1,5 @@
 const CategoryModel = require('../models/categoryModel');
 const ClaimModel    = require('../models/claimModel');
-const comunicadoController = require('./comunicadoController');
 const { CATEGORY_TYPES } = require('../constants/publication');
 
 const reclamoController = {
@@ -55,11 +54,6 @@ const reclamoController = {
       console.error('Error reclamos para mapa:', err);
       res.status(500).json({ ok: false, mensaje: 'Error al obtener datos del mapa' });
     }
-  },
-
-  async eliminarComunicado(req, res) {
-    // Compatibilidad temporal hasta que la ruta se mueva a comunicadoRoutes.
-    return comunicadoController.eliminar(req, res);
   },
 };
 

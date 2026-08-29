@@ -1,9 +1,9 @@
 const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../../controllers/admin/categoryController');
-const { verifyToken, requireRole } = require('../../middlewares/authMiddleware');
+const { verifyToken, requireAdmin } = require('../../middlewares/authMiddleware');
 
-router.use(verifyToken, requireRole('admin'));
+router.use(verifyToken, requireAdmin);
 
 router.get('/',           ctrl.listar);
 router.get('/:id',        ctrl.obtener);
