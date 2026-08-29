@@ -2,9 +2,6 @@ const express = require('express');
 const router  = express.Router();
 const upload  = require('../../middlewares/upload');
 const ctrl    = require('../../controllers/admin/uploadController');
-const { verifyToken } = require('../../middlewares/authMiddleware');
-
-router.use(verifyToken);
 
 router.post('/foto', (req, res, next) => {
   upload.single('foto')(req, res, (err) => {
