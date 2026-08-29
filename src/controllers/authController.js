@@ -2,6 +2,7 @@ const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const emailService = require('../config/emailService');
+const { ROLES, normalizeRole } = require('../constants/roles');
 
 const OTP_EXPIRATION_MINUTES = 15;
 const REFRESH_TOKEN_EXPIRATION_DAYS = 7;
@@ -40,21 +41,31 @@ const createUserRecord = async (connection, email, hashedPassword, otp, expiresA
 };
 
 const resolveUserRole = async (userId, defaultRole) => {
-  if (defaultRole && defaultRole !== 'usuario') {
-    return defaultRole;
+  const raw = defaultRole ? String(defaultRole).trim().toLowerCase() : '';
+
+  if (raw === 'admin') {
+    return ROLES.ADMIN;
+  }
+
+  if (raw === 'ciudadano' || raw === 'citizen') {
+    return ROLES.CIUDADANO;
+  }
+
+  if (raw === 'institucion' || raw === 'institution') {
+    return ROLES.INSTITUCION;
   }
 
   const [citizens] = await db.query('SELECT id_ciudadano FROM ciudadanos WHERE id_usuario = ?', [userId]);
   if (citizens.length > 0) {
-    return 'citizen';
+    return ROLES.CIUDADANO;
   }
 
   const [institutions] = await db.query('SELECT id_institucion FROM instituciones WHERE id_usuario = ?', [userId]);
   if (institutions.length > 0) {
-    return 'institution';
+    return ROLES.INSTITUCION;
   }
 
-  return defaultRole || 'usuario';
+  return ROLES.CIUDADANO;
 };
 
 const generateSocialPassword = async (provider, email) => {
@@ -63,14 +74,16 @@ const generateSocialPassword = async (provider, email) => {
 };
 
 const createTokens = (userId, email, role) => {
+  const normalizedRole = normalizeRole(role);
+
   const accessToken = jwt.sign(
-    { id: userId, email, role },
+    { id: userId, email, role: normalizedRole },
     process.env.JWT_SECRET,
     { expiresIn: '15m' }
   );
 
   const refreshToken = jwt.sign(
-    { id: userId, email, role },
+    { id: userId, email, role: normalizedRole },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: '7d' }
   );
@@ -507,7 +520,7 @@ const refreshToken = async (req, res) => {
       }
 
       const newAccessToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, role: normalizeRole(user.role) },
         process.env.JWT_SECRET,
         { expiresIn: '15m' }
       );

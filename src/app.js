@@ -1,8 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const { verifyToken, requireAdmin } = require('./middlewares/authMiddleware');
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const app = express();
 
@@ -13,63 +14,50 @@ app.get('/', (req, res) => {
   res.send('API ReportARG funcionando');
 });
 
-// Rutas
-//authRoutes
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
-//userRoutes
+const profileRoutes = require('./routes/profileRoutes');
+const uploadRoutes = require('./routes/admin/uploadRoutes');
+
+app.use('/api/admin/usuarios/me', verifyToken, profileRoutes);
+app.use('/api/admin/upload', verifyToken, uploadRoutes);
+
+app.use('/api/admin', verifyToken, requireAdmin);
+
 const userRoutes = require('./routes/admin/userRoutes');
 app.use('/api/admin/usuarios', userRoutes);
 
-//categoryRoutes
 const categoryRoutes = require('./routes/admin/categoryRoutes');
 app.use('/api/admin/categorias', categoryRoutes);
 
-//institutionRoutes
 const institutionRoutes = require('./routes/admin/institutionRoutes');
 app.use('/api/admin/instituciones', institutionRoutes);
 
-//claimRoutes
 const claimRoutes = require('./routes/admin/claimRoutes');
 app.use('/api/admin/reclamos', claimRoutes);
 
-//searchRoutes
 const searchRoutes = require('./routes/admin/searchRoutes');
 app.use('/api/admin/buscar', searchRoutes);
 
-//notificationRoutes
 const notificationRoutes = require('./routes/admin/notificationRoutes');
 app.use('/api/admin/notificaciones', notificationRoutes);
 
-//uploadRoutes
-const uploadRoutes = require('./routes/admin/uploadRoutes');
-app.use('/api/admin/upload', uploadRoutes);
-
-//feedRoutes (público)
 const feedRoutes = require('./routes/feedRoutes');
 app.use('/api/feed', feedRoutes);
 
-//reclamoRoutes (ciudadano)
 const reclamoRoutes = require('./routes/reclamoRoutes');
 app.use('/api/reclamos', reclamoRoutes);
 
-//comunicadoRoutes (institución)
 const comunicadoRoutes = require('./routes/comunicadoRoutes');
 app.use('/api/comunicados', comunicadoRoutes);
 
-//comentarioRoutes
 const comentarioRoutes = require('./routes/comentarioRoutes');
 app.use('/api/comentarios', comentarioRoutes);
 
-const PORT = process.env.PORT || 3001;
-
-// Error handler global — devuelve JSON en vez de HTML
 app.use((err, req, res, next) => {
   console.error('Error no manejado:', err.message);
   res.status(err.status || 500).json({ ok: false, mensaje: err.message || 'Error interno del servidor' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
-});
+module.exports = app;
