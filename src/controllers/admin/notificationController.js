@@ -4,7 +4,7 @@ const notificationController = {
 
   async listar(req, res) {
   try {
-    const idUsuario = req.usuario?.id_usuario || 1;
+    const idUsuario = req.user.id;
     const notifs    = await NotificationModel.getByUsuario(idUsuario);
 
     const data = notifs.map(n => ({
@@ -24,7 +24,7 @@ const notificationController = {
 
   async marcarLeida(req, res) {
     try {
-      const idUsuario = req.usuario?.id_usuario || 1;
+      const idUsuario = req.user.id;
       await NotificationModel.marcarLeida(req.params.id, idUsuario);
       res.json({ ok: true, mensaje: 'Notificación marcada como leída' });
     } catch (err) {
@@ -35,7 +35,7 @@ const notificationController = {
 
   async marcarTodasLeidas(req, res) {
     try {
-      const idUsuario = req.usuario?.id_usuario || 1;
+      const idUsuario = req.user.id;
       await NotificationModel.marcarTodasLeidas(idUsuario);
       res.json({ ok: true, mensaje: 'Todas las notificaciones marcadas como leídas' });
     } catch (err) {

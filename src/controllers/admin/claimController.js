@@ -1,4 +1,5 @@
 const ClaimModel = require('../../models/claimModel');
+const { CLAIM_STATUSES } = require('../../constants/publication');
 
 const claimController = {
 
@@ -76,7 +77,7 @@ const claimController = {
   async actualizarEstado(req, res) {
     try {
       const { estado } = req.body;
-      const estados = ['recibido', 'en_proceso', 'resuelto', 'rechazado'];
+      const estados = Object.values(CLAIM_STATUSES);
       if (!estados.includes(estado))
         return res.status(400).json({ ok: false, mensaje: 'Estado inválido' });
       const affected = await ClaimModel.updateEstado(req.params.id, estado);
