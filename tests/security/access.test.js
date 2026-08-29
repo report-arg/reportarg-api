@@ -21,6 +21,7 @@ jest.mock('../../src/config/emailService', () => ({
 
 const request = require('supertest');
 const app = require('../../src/app');
+const db = require('../../src/config/db');
 const { generateTestToken, ROLES } = require('../helpers/auth');
 
 describe('Seguridad y control de acceso', () => {
@@ -70,6 +71,31 @@ describe('Seguridad y control de acceso', () => {
         .send({ titulo: 'Test' });
 
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe('GET /api/reclamos/mis-reclamos', () => {
+    test('ignora el id de usuario enviado por query y usa el id del JWT', async () => {
+      const idUsuarioA = 7;
+      const idUsuarioB = 11;
+      db.query.mockClear();
+      db.query.mockResolvedValueOnce([[
+        { id: 101, titulo: 'Reclamo del usuario A', estado: 'recibido' },
+      ]]);
+
+      const token = generateTestToken(ROLES.CIUDADANO, idUsuarioA);
+      const res = await request(app)
+        .get(`/api/reclamos/mis-reclamos?usuario=${idUsuarioB}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual([
+        { id: 101, titulo: 'Reclamo del usuario A', estado: 'recibido' },
+      ]);
+
+      const [, params] = db.query.mock.calls[0];
+      expect(params).toEqual([idUsuarioA]);
+      expect(params).not.toContain(idUsuarioB);
     });
   });
 
