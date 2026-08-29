@@ -55,6 +55,12 @@ describe('Seguridad y control de acceso', () => {
       const res = await request(app).get('/api/feed');
       expect(res.status).toBe(200);
     });
+
+    test('GET /api/docs es público', async () => {
+      const res = await request(app).get('/api/docs/');
+      expect(res.status).toBe(200);
+      expect(res.text).toMatch(/swagger/i);
+    });
   });
 
   describe('POST /api/reclamos', () => {

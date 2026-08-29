@@ -11,8 +11,11 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.send('API ReportARG funcionando');
+  res.send('API ReportARG funcionando. Documentación: /api/docs');
 });
+
+const setupSwagger = require('./docs/setupSwagger');
+setupSwagger(app);
 
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
