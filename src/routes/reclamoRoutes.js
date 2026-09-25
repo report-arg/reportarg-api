@@ -3,9 +3,22 @@ const router  = express.Router();
 const ctrl    = require('../controllers/reclamoController');
 const { verifyToken, requireCiudadano } = require('../middlewares/authMiddleware');
 
+// Categorías para reclamo
 router.get('/categorias',   ctrl.categoriasParaReclamo);
-router.get('/mapa',         ctrl.reclamosParaMapa);
+
+// Reclamos públicos de la ciudad
+router.get('/publicos',     verifyToken, ctrl.reclamosPublicos);
+
+// Reclamos personales del ciudadano (HU-06)
 router.get('/mis-reclamos', verifyToken, requireCiudadano, ctrl.misReclamos);
-router.post('/',            verifyToken, requireCiudadano, ctrl.crear);
+
+// Datos para mapa público
+router.get('/mapa',         verifyToken, ctrl.reclamosParaMapa);
+
+// Detalle completo del reclamo (HU-08)
+router.get('/:id',          verifyToken, ctrl.obtenerDetalle);
+
+// Crear nuevo reclamo (HU-01, HU-02, HU-03)
+router.post('/',            verifyToken, ctrl.crear);
 
 module.exports = router;
