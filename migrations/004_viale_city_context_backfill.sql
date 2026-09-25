@@ -35,8 +35,18 @@ WHERE id_ciudad IS NULL;
 -- usuarios.id_ciudad → NULL permitido (para ciudadanos en ciudades no activadas aún)
 ALTER TABLE usuarios MODIFY COLUMN id_ciudad INT NULL DEFAULT NULL;
 
+-- 5.1 Redefinición de FKs de ciudad a ON DELETE RESTRICT para poder aplicar la restricción NOT NULL
+ALTER TABLE instituciones DROP FOREIGN KEY fk_instituciones_ciudad;
+ALTER TABLE instituciones ADD CONSTRAINT fk_instituciones_ciudad FOREIGN KEY (id_ciudad) REFERENCES ciudades (id_ciudad) ON DELETE RESTRICT;
+
+ALTER TABLE reclamos DROP FOREIGN KEY fk_reclamos_ciudad;
+ALTER TABLE reclamos ADD CONSTRAINT fk_reclamos_ciudad FOREIGN KEY (id_ciudad) REFERENCES ciudades (id_ciudad) ON DELETE RESTRICT;
+
 -- instituciones.id_ciudad → NOT NULL (toda institución operativa pertenece a una ciudad activa)
 ALTER TABLE instituciones MODIFY COLUMN id_ciudad INT NOT NULL;
 
 -- reclamos.id_ciudad → NOT NULL (todo reclamo pertenece a una ciudad activa)
 ALTER TABLE reclamos MODIFY COLUMN id_ciudad INT NOT NULL;
+
+
+
