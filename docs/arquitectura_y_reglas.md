@@ -136,6 +136,8 @@ Las migraciones de base de datos se estructuran mediante scripts SQL secuenciale
 
 ---
 
+---
+
 ## 17. Decisiones futuras / todavía no implementadas
 
 Las siguientes capacidades forman parte de la hoja de ruta del producto pero NO están implementadas actualmente:
@@ -145,6 +147,8 @@ Las siguientes capacidades forman parte de la hoja de ruta del producto pero NO 
 - Pantalla "ReportARG todavía no está disponible en tu ciudad".
 - Modo de exploración de información pública de otras ciudades.
 - Administración y métricas multi-ciudad.
+- **Modelar comentarios de Comunicados:** Pendiente definir esquema relacional limpio (evaluando `comentarios.id_comunicado` o tabla dedicada `comentarios_comunicados`) evitando reutilizar indebidamente `id_reclamo`.
+- **Limpieza de reclamos de prueba legacy de instituciones (Migración 005):** El script `005_cleanup_legacy_institution_claims.sql` fue diseñado exclusivamente para eliminar los registros de prueba generados por usuarios de tipo institución en la tabla `reclamos` antes de separar el módulo de Comunicados, junto con sus registros dependientes, evitando la migración a `comunicados` al tratarse de datos ficticios de desarrollo.
 
 ---
 
@@ -159,4 +163,6 @@ Las siguientes capacidades forman parte de la hoja de ruta del producto pero NO 
 | 2026-09-25 | Creación del endpoint `/api/auth/me` | Aislar la carga de contexto de perfil ciudadano de las rutas administrativas. |
 | 2026-09-25 | Backfill legacy via `004_viale_city_context_backfill.sql` y remoción de `DEFAULT 1` | Regularizar datos históricos sin imponer Viale a usuarios futuros. |
 | 2026-09-25 | Estabilización multi-ciudad, modelo separado de Comunicados en feed, eliminación de Comentar en Reclamos | Eliminar fallbacks `id_ciudad = 1`, separar fisicamente reclamos/comunicados, extraer `cityService` y fortalecer seguridad de reclamos privados. |
+| 2026-09-25 | Simplificación de la migración 005 a limpieza de datos de prueba legacy (`005_cleanup_legacy_institution_claims.sql`) | Eliminar reclamos de prueba creados por instituciones respetando FKs relacionales, descartando la migración a `comunicados` por ser datos ficticios de desarrollo académico. |
+
 

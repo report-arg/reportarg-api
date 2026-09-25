@@ -83,8 +83,9 @@ const FeedModel = {
           1                                               AS esInstitucion,
           COALESCE(inst.verificada, 0)                    AS verificada,
           com.imagen                                      AS imagen,
-          CAST((SELECT COUNT(*) FROM comentarios c_com WHERE c_com.id_reclamo = com.id_comunicado) AS UNSIGNED) AS cantidadComentarios
+          0                                               AS cantidadComentarios
         FROM comunicados com
+
         INNER JOIN instituciones inst ON inst.id_institucion = com.id_institucion
         LEFT JOIN categorias c        ON c.id_categoria   = com.id_categoria
         ${comunicadoWhere}
