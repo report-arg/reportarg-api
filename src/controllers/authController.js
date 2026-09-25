@@ -30,11 +30,11 @@ const findUserByEmail = async (email) => {
   return users[0] || null;
 };
 
-const createUserRecord = async (connection, email, hashedPassword, otp, expiresAt) => {
+const createUserRecord = async (connection, email, hashedPassword, otp, expiresAt, idCiudad = null) => {
   const [userResult] = await connection.query(
-    `INSERT INTO usuarios (email, password, email_verified, verification_code, verification_expires, auth_provider, activo)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [email, hashedPassword, false, otp, expiresAt, 'local', true]
+    `INSERT INTO usuarios (email, password, email_verified, verification_code, verification_expires, auth_provider, activo, id_ciudad)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [email, hashedPassword, false, otp, expiresAt, 'local', true, idCiudad]
   );
 
   return userResult.insertId;
@@ -219,7 +219,14 @@ const registerCitizen = async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      const userId = await createUserRecord(connection, email, hashedPassword, otp, expiresAt);
+      // Buscar si la ciudad declarada corresponde a una ciudad activa en ReportARG
+      const [matchedCity] = await connection.query(
+        'SELECT id_ciudad FROM ciudades WHERE LOWER(nombre) = ? AND activa = 1 LIMIT 1',
+        [String(ciudad).trim().toLowerCase()]
+      );
+      const idCiudadActiva = matchedCity[0] ? matchedCity[0].id_ciudad : null;
+
+      const userId = await createUserRecord(connection, email, hashedPassword, otp, expiresAt, idCiudadActiva);
 
       await connection.query(
         `INSERT INTO ciudadanos (id_usuario, nombre, apellido, provincia, ciudad, zona)
@@ -273,11 +280,17 @@ const registerInstitution = async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      const userId = await createUserRecord(connection, email, hashedPassword, otp, expiresAt);
+      const [matchedCity] = await connection.query(
+        'SELECT id_ciudad FROM ciudades WHERE LOWER(nombre) = ? AND activa = 1 LIMIT 1',
+        [String(ciudad).trim().toLowerCase()]
+      );
+      const idCiudadActiva = matchedCity[0] ? matchedCity[0].id_ciudad : null;
+
+      const userId = await createUserRecord(connection, email, hashedPassword, otp, expiresAt, idCiudadActiva);
 
       await connection.query(
-        `INSERT INTO instituciones (id_usuario, nombre, tipo, telefono, provincia, ciudad, zona, direccion, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO instituciones (id_usuario, nombre, tipo, telefono, provincia, ciudad, zona, direccion, status, id_ciudad)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           userId,
           institutionName,
@@ -288,6 +301,7 @@ const registerInstitution = async (req, res) => {
           zona,
           address,
           'pending',
+          idCiudadActiva,
         ]
       );
 
