@@ -5,9 +5,9 @@
 Este documento registra las decisiones funcionales, la arquitectura de dominio y las reglas transversales de **ReportARG**. Sirve como la fuente de verdad sobre el funcionamiento general de la plataforma.
 
 ### Estructura de la documentación del proyecto:
-- [README.md](file:///c:/Users/usuario/Desktop/reportARG/reportarg-api/README.md): Introducción al repositorio, ambiente de desarrollo y comandos de ejecución.
-- [docs/arquitectura_y_reglas.md](file:///c:/Users/usuario/Desktop/reportARG/reportarg-api/docs/arquitectura_y_reglas.md): Reglas generales, arquitectura territorial y decisiones transversales del sistema.
-- [docs/sprint4_reclamos.md](file:///c:/Users/usuario/Desktop/reportARG/reportarg-api/docs/sprint4_reclamos.md): Especificación técnica y desglose detallado del módulo de Reclamos.
+- [README.md](../README.md): Introducción al repositorio, ambiente de desarrollo y comandos de ejecución.
+- [docs/arquitectura_y_reglas.md](./arquitectura_y_reglas.md): Reglas generales, arquitectura territorial y decisiones transversales del sistema.
+- [docs/sprint4_reclamos.md](./sprint4_reclamos.md): Especificación técnica y desglose detallado del módulo de Reclamos.
 
 ---
 
@@ -94,7 +94,7 @@ La asignación automática sigue la regla:
 Si no existe una institución asociada específicamente a esa categoría en esa ciudad:
 → Asigna a la institución principal (`es_principal = 1`) de esa misma ciudad.
 
-*Para la especificación completa del módulo de reclamos, consultar [docs/sprint4_reclamos.md](file:///c:/Users/usuario/Desktop/reportARG/reportarg-api/docs/sprint4_reclamos.md).*
+*Para la especificación completa del módulo de reclamos, consultar [docs/sprint4_reclamos.md](./sprint4_reclamos.md).*
 
 ---
 
@@ -118,7 +118,7 @@ Se utiliza el endpoint autenticado `/api/auth/me` para obtener el perfil del usu
 
 ## 14. Datos legacy y backfill de Viale
 
-Mediante la migración SQL idempotente [004_viale_city_context_backfill.sql](file:///c:/Users/usuario/Desktop/reportARG/reportarg-api/migrations/004_viale_city_context_backfill.sql), se asociaron los registros de prueba generados previamente (`usuarios`, `instituciones`, `reclamos` con `id_ciudad IS NULL`) a Viale y se eliminaron los `DEFAULT 1` del esquema.
+Mediante la migración SQL idempotente [004_viale_city_context_backfill.sql](../migrations/004_viale_city_context_backfill.sql), se asociaron los registros de prueba generados previamente (`usuarios`, `instituciones`, `reclamos` con `id_ciudad IS NULL`) a Viale y se eliminaron los `DEFAULT 1` del esquema.
 
 *Aclaración de arquitectura:* Este backfill fue una migración puntual de datos históricos de desarrollo y no constituye una regla de negocio en tiempo de ejecución.
 
@@ -132,7 +132,7 @@ Regla de arquitectura: Queda prohibido hardcodear IDs de ciudad (`id_ciudad = 1`
 
 ## 16. Ambientes y migraciones
 
-Las migraciones de base de datos se estructuran mediante scripts SQL secuenciales en la carpeta `migrations/` y se ejecutan siguiendo los lineamientos documentados en [migrations/REGLAS_MIGRACIONES.md](file:///c:/Users/usuario/Desktop/reportARG/reportarg-api/migrations/REGLAS_MIGRACIONES.md).
+Las migraciones de base de datos se estructuran mediante scripts SQL secuenciales en la carpeta `migrations/` y se ejecutan siguiendo los lineamientos documentados en [migrations/REGLAS_MIGRACIONES.md](../migrations/REGLAS_MIGRACIONES.md).
 
 ---
 

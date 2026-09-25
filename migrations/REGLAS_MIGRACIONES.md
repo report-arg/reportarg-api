@@ -33,7 +33,7 @@
 
 ## 🛠️ Ejecución para el Sprint 4 (Reclamos)
 
-El archivo [`001_sprint4_schema_reclamos.sql`](file:///c:/Users/usuario/Desktop/reportARG/reportarg-api/migrations/001_sprint4_schema_reclamos.sql) contiene todas las definiciones estructurales del Sprint 4:
+El archivo [`001_sprint4_schema_reclamos.sql`](./001_sprint4_schema_reclamos.sql) contiene todas las definiciones estructurales del Sprint 4:
 - Creación de tablas: `ciudades`, `institucion_categorias`, `reclamos_afectados`, `reclamos_actualizaciones`, `reclamos_historial`.
 - Actualización de columnas en `usuarios`, `instituciones` y `reclamos`.
 - Transición del ENUM de estados: `Pendiente` → `En revisión` → `En proceso` → `Resuelto` y `Cancelado`.
