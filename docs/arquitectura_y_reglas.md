@@ -158,3 +158,5 @@ Las siguientes capacidades forman parte de la hoja de ruta del producto pero NO 
 | 2026-09-25 | Aislamiento del Feed por ciudad desde SQL backend | Garantizar la privacidad y separación de datos por municipio. |
 | 2026-09-25 | Creación del endpoint `/api/auth/me` | Aislar la carga de contexto de perfil ciudadano de las rutas administrativas. |
 | 2026-09-25 | Backfill legacy via `004_viale_city_context_backfill.sql` y remoción de `DEFAULT 1` | Regularizar datos históricos sin imponer Viale a usuarios futuros. |
+| 2026-09-25 | Estabilización multi-ciudad, modelo separado de Comunicados en feed, eliminación de Comentar en Reclamos | Eliminar fallbacks `id_ciudad = 1`, separar fisicamente reclamos/comunicados, extraer `cityService` y fortalecer seguridad de reclamos privados. |
+

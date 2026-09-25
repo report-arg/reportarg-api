@@ -97,16 +97,19 @@ const InstitutionModel = {
    * Obtiene la institución asignada a una categoría en una ciudad (HU-04)
    */
   async getPorCategoriaYCiudad(idCategoria, idCiudad) {
+    if (!idCiudad) return null;
+
     const [rows] = await db.query(
       `SELECT i.id_institucion AS id, i.nombre
        FROM instituciones i
        INNER JOIN institucion_categorias ic ON ic.id_institucion = i.id_institucion
-       WHERE ic.id_categoria = ? AND (i.id_ciudad = ? OR i.id_ciudad IS NULL)
+       WHERE ic.id_categoria = ? AND i.id_ciudad = ?
        LIMIT 1`,
       [idCategoria, idCiudad]
     );
     return rows[0] || null;
   },
+
 
   /**
    * Define la institución principal de una ciudad asegurando unicidad (HU-05)

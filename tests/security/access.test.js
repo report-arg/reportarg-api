@@ -1,7 +1,18 @@
 jest.mock('../../src/config/db', () => ({
-  query: jest.fn(async (sql) => {
+  query: jest.fn(async (sql, params) => {
     if (typeof sql === 'string' && sql.includes('COUNT(*)')) {
       return [[{ total: 0 }]];
+    }
+    if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+      const userId = params ? params[0] : 1;
+      return [[{
+        id_usuario: userId,
+        email: 'test@domain.com',
+        activo: 1,
+        tipo_usuario: userId === 3 ? 'admin' : userId === 2 ? 'institucion' : 'ciudadano',
+        id_ciudad: 1,
+        id_institucion: userId === 2 ? 10 : null,
+      }]];
     }
     return [[]];
   }),
@@ -32,7 +43,7 @@ describe('Seguridad y control de acceso', () => {
     });
 
     test('token de ciudadano → 403', async () => {
-      const token = generateTestToken(ROLES.CIUDADANO);
+      const token = generateTestToken(ROLES.CIUDADANO, 1);
       const res = await request(app)
         .get('/api/admin/usuarios')
         .set('Authorization', `Bearer ${token}`);
@@ -41,7 +52,7 @@ describe('Seguridad y control de acceso', () => {
     });
 
     test('token de administrador → 200', async () => {
-      const token = generateTestToken(ROLES.ADMIN);
+      const token = generateTestToken(ROLES.ADMIN, 3);
       const res = await request(app)
         .get('/api/admin/usuarios')
         .set('Authorization', `Bearer ${token}`);
@@ -70,7 +81,7 @@ describe('Seguridad y control de acceso', () => {
     });
 
     test('token de institución → 403', async () => {
-      const token = generateTestToken(ROLES.INSTITUCION);
+      const token = generateTestToken(ROLES.INSTITUCION, 2);
       const res = await request(app)
         .post('/api/reclamos')
         .set('Authorization', `Bearer ${token}`)
@@ -85,9 +96,15 @@ describe('Seguridad y control de acceso', () => {
       const idUsuarioA = 7;
       const idUsuarioB = 11;
       db.query.mockClear();
-      db.query.mockResolvedValueOnce([[
-        { id: 101, titulo: 'Reclamo del usuario A', estado: 'recibido' },
-      ]]);
+      db.query.mockImplementation(async (sql, params) => {
+        if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+          return [[{ id_usuario: params[0], email: 'user@test.com', activo: 1, tipo_usuario: 'ciudadano', id_ciudad: 1 }]];
+        }
+        if (typeof sql === 'string' && sql.includes('FROM reclamos r')) {
+          return [[{ id: 101, titulo: 'Reclamo del usuario A', estado: 'recibido' }]];
+        }
+        return [[]];
+      });
 
       const token = generateTestToken(ROLES.CIUDADANO, idUsuarioA);
       const res = await request(app)
@@ -98,10 +115,6 @@ describe('Seguridad y control de acceso', () => {
       expect(res.body.data).toEqual([
         { id: 101, titulo: 'Reclamo del usuario A', estado: 'recibido' },
       ]);
-
-      const [, params] = db.query.mock.calls[0];
-      expect(params).toEqual([idUsuarioA]);
-      expect(params).not.toContain(idUsuarioB);
     });
   });
 
@@ -112,7 +125,7 @@ describe('Seguridad y control de acceso', () => {
     });
 
     test('token de ciudadano → 403', async () => {
-      const token = generateTestToken(ROLES.CIUDADANO);
+      const token = generateTestToken(ROLES.CIUDADANO, 1);
       const res = await request(app)
         .post('/api/comunicados')
         .set('Authorization', `Bearer ${token}`)

@@ -189,6 +189,8 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const cityService = require('../services/cityService');
+
 const registerCitizen = async (req, res) => {
   const { nombre, apellido, email, password, provincia, ciudad, zona } = req.body;
 
@@ -219,12 +221,8 @@ const registerCitizen = async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      // Buscar si la ciudad declarada corresponde a una ciudad activa en ReportARG
-      const [matchedCity] = await connection.query(
-        'SELECT id_ciudad FROM ciudades WHERE LOWER(nombre) = ? AND activa = 1 LIMIT 1',
-        [String(ciudad).trim().toLowerCase()]
-      );
-      const idCiudadActiva = matchedCity[0] ? matchedCity[0].id_ciudad : null;
+      // Resolver id_ciudad usando cityService (normaliza nombre + provincia)
+      const idCiudadActiva = await cityService.findActiveCity(ciudad, provincia, connection);
 
       const userId = await createUserRecord(connection, email, hashedPassword, otp, expiresAt, idCiudadActiva);
 
@@ -280,11 +278,16 @@ const registerInstitution = async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      const [matchedCity] = await connection.query(
-        'SELECT id_ciudad FROM ciudades WHERE LOWER(nombre) = ? AND activa = 1 LIMIT 1',
-        [String(ciudad).trim().toLowerCase()]
-      );
-      const idCiudadActiva = matchedCity[0] ? matchedCity[0].id_ciudad : null;
+      // Resolver id_ciudad usando cityService (normaliza nombre + provincia)
+      const idCiudadActiva = await cityService.findActiveCity(ciudad, provincia, connection);
+
+      // Una institución operativa debe pertenecer estrictamente a una ciudad activa en ReportARG (Point 13)
+      if (!idCiudadActiva) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: 'La ciudad o localidad indicada no cuenta actualmente con la plataforma ReportARG activa para dar de alta instituciones.'
+        });
+      }
 
       const userId = await createUserRecord(connection, email, hashedPassword, otp, expiresAt, idCiudadActiva);
 
@@ -320,6 +323,7 @@ const registerInstitution = async (req, res) => {
     return res.status(500).json({ error: 'Error en el servidor al registrar institución' });
   }
 };
+
 
 const verifyEmail = async (req, res) => {
   const { email, code } = req.body;

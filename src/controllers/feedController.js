@@ -1,6 +1,6 @@
 const FeedModel    = require('../models/feedModel');
 const CategoryModel = require('../models/categoryModel');
-const db            = require('../config/db');
+const cityService   = require('../services/cityService');
 
 const feedController = {
 
@@ -14,12 +14,11 @@ const feedController = {
       let idCiudad = null;
 
       if (req.user) {
-        // Usuario autenticado: usar su id_ciudad (puede ser null si pertenece a una ciudad no activa)
+        // Usuario autenticado: usar su id_ciudad (null si pertenece a una ciudad no activa)
         idCiudad = req.user.id_ciudad;
       } else {
-        // Usuario no autenticado / público: fallback dinámico a la ciudad activa de ReportARG
-        const [activeCities] = await db.query('SELECT id_ciudad FROM ciudades WHERE activa = 1 LIMIT 1');
-        idCiudad = activeCities[0]?.id_ciudad || null;
+        // Visitante anónimo: fallback a la primera ciudad activa en ReportARG
+        idCiudad = await cityService.getFirstActiveCity();
       }
 
       const { items, total } = await FeedModel.getFeed({ idCiudad, idCategoria: categoria, tipo, pagina, limite });
@@ -56,8 +55,7 @@ const feedController = {
       if (req.user) {
         idCiudad = req.user.id_ciudad;
       } else {
-        const [activeCities] = await db.query('SELECT id_ciudad FROM ciudades WHERE activa = 1 LIMIT 1');
-        idCiudad = activeCities[0]?.id_ciudad || null;
+        idCiudad = await cityService.getFirstActiveCity();
       }
 
       const data = await FeedModel.getTendencias(idCiudad);
@@ -70,4 +68,3 @@ const feedController = {
 };
 
 module.exports = feedController;
-
