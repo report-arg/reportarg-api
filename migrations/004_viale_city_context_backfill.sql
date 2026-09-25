@@ -1,5 +1,5 @@
 -- ============================================================
--- SCRIPT DE MIGRACIÓN: CONTEXTO DE CIUDAD VIALE, BACKFILL LEGACY & ESQUEMA ESTRICTO
+-- SCRIPT DE MIGRACIÓN: CONTEXTO DE CIUDAD VIALE, BACKFILL TERRITORIAL & ESQUEMA ESTRICTO
 -- ============================================================
 
 -- 1. Obtener/Verificar la existencia de Viale (Entre Ríos) como ciudad activa
@@ -31,19 +31,7 @@ UPDATE reclamos
 SET id_ciudad = @viale_id 
 WHERE id_ciudad IS NULL;
 
--- 5. Migración de comunicados legacy (si existieron instituciones que crearon filas en la tabla `reclamos`)
-INSERT INTO comunicados (id_institucion, titulo, contenido, id_categoria, fecha_publicacion, imagen)
-SELECT inst.id_institucion, r.titulo, r.descripcion, r.id_categoria, r.fecha_creacion, r.imagen
-FROM reclamos r
-INNER JOIN instituciones inst ON inst.id_usuario = r.id_usuario
-WHERE NOT EXISTS (
-    SELECT 1 FROM comunicados c WHERE c.titulo = r.titulo AND c.id_institucion = inst.id_institucion
-);
-
-DELETE r FROM reclamos r
-INNER JOIN instituciones inst ON inst.id_usuario = r.id_usuario;
-
--- 6. Aplicación de restricciones estrictas según el modelo de datos
+-- 5. Aplicación de restricciones estrictas según el modelo de datos
 -- usuarios.id_ciudad → NULL permitido (para ciudadanos en ciudades no activadas aún)
 ALTER TABLE usuarios MODIFY COLUMN id_ciudad INT NULL DEFAULT NULL;
 

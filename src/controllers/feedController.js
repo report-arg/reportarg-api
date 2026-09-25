@@ -1,6 +1,5 @@
 const FeedModel    = require('../models/feedModel');
 const CategoryModel = require('../models/categoryModel');
-const cityService   = require('../services/cityService');
 
 const feedController = {
 
@@ -11,15 +10,8 @@ const feedController = {
       const categoria = req.query.categoria         || null;
       const tipo      = req.query.tipo              || null; // 'reclamo' | 'comunicado'
 
-      let idCiudad = null;
-
-      if (req.user) {
-        // Usuario autenticado: usar su id_ciudad (null si pertenece a una ciudad no activa)
-        idCiudad = req.user.id_ciudad;
-      } else {
-        // Visitante anónimo: fallback a la primera ciudad activa en ReportARG
-        idCiudad = await cityService.getFirstActiveCity();
-      }
+      // Resolver ciudad activa estrictamente desde el contexto del usuario autenticado
+      const idCiudad  = req.user?.id_ciudad || null;
 
       const { items, total } = await FeedModel.getFeed({ idCiudad, idCategoria: categoria, tipo, pagina, limite });
 
@@ -29,7 +21,9 @@ const feedController = {
         total,
         pagina,
         totalPaginas: Math.ceil(total / limite) || 1,
-        mensaje: !idCiudad ? 'Tu ciudad declarada aún no cuenta con la plataforma ReportARG activa.' : undefined,
+        mensaje: !idCiudad 
+          ? (req.user ? 'Tu ciudad declarada aún no cuenta con la plataforma ReportARG activa.' : 'Es necesario acceder con un contexto de ciudad activa para consultar las publicaciones.') 
+          : undefined,
       });
     } catch (err) {
       console.error('Error feed:', err);
@@ -50,15 +44,8 @@ const feedController = {
 
   async getTendencias(req, res) {
     try {
-      let idCiudad = null;
-
-      if (req.user) {
-        idCiudad = req.user.id_ciudad;
-      } else {
-        idCiudad = await cityService.getFirstActiveCity();
-      }
-
-      const data = await FeedModel.getTendencias(idCiudad);
+      const idCiudad = req.user?.id_ciudad || null;
+      const data     = await FeedModel.getTendencias(idCiudad);
       res.json({ ok: true, data });
     } catch (err) {
       console.error('Error tendencias:', err);
