@@ -5,7 +5,7 @@ const FeedModel = {
   async getFeed({ idCategoria = null, tipo = null, pagina = 1, limite = 10 } = {}) {
     const offset = (pagina - 1) * limite;
     const params = [];
-    let where = `WHERE r.estado != 'rechazado'`;
+    let where = `WHERE r.estado != 'Cancelado' AND r.estado != 'rechazado' AND (r.visibilidad = 'publico' OR r.visibilidad IS NULL)`;
 
     if (idCategoria) {
       where += ` AND r.id_categoria = ?`;

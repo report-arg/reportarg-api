@@ -78,6 +78,47 @@ const InstitutionModel = {
       pendientes:  pendientes.total,
     };
   },
+
+  /**
+   * Obtiene la institución principal de una ciudad determinada (HU-05)
+   */
+  async getPrincipalDeCiudad(idCiudad) {
+    const [rows] = await db.query(
+      `SELECT i.id_institucion AS id, i.nombre
+       FROM instituciones i
+       WHERE i.id_ciudad = ? AND i.es_principal = 1
+       LIMIT 1`,
+      [idCiudad]
+    );
+    return rows[0] || null;
+  },
+
+  /**
+   * Obtiene la institución asignada a una categoría en una ciudad (HU-04)
+   */
+  async getPorCategoriaYCiudad(idCategoria, idCiudad) {
+    const [rows] = await db.query(
+      `SELECT i.id_institucion AS id, i.nombre
+       FROM instituciones i
+       INNER JOIN institucion_categorias ic ON ic.id_institucion = i.id_institucion
+       WHERE ic.id_categoria = ? AND (i.id_ciudad = ? OR i.id_ciudad IS NULL)
+       LIMIT 1`,
+      [idCategoria, idCiudad]
+    );
+    return rows[0] || null;
+  },
+
+  /**
+   * Define la institución principal de una ciudad asegurando unicidad (HU-05)
+   */
+  async setPrincipalDeCiudad(idCiudad, idInstitucion) {
+    await db.query(`UPDATE instituciones SET es_principal = 0 WHERE id_ciudad = ?`, [idCiudad]);
+    const [result] = await db.query(
+      `UPDATE instituciones SET es_principal = 1 WHERE id_institucion = ? AND id_ciudad = ?`,
+      [idInstitucion, idCiudad]
+    );
+    return result.affectedRows;
+  }
 };
 
 module.exports = InstitutionModel;
