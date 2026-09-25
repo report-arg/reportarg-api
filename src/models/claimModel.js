@@ -18,10 +18,14 @@ const ClaimModel = {
   /**
    * Crea un nuevo reclamo público o privado (HU-01, HU-02, HU-03)
    */
-  async crear({ titulo, descripcion, id_categoria, id_usuario, id_ciudad = 1, id_institucion = null, direccion, latitud, longitud, visibilidad = 'publico' }) {
+  async crear({ titulo, descripcion, id_categoria, id_usuario, id_ciudad, id_institucion = null, direccion, latitud, longitud, visibilidad = 'publico', imagen = null }) {
+    if (!id_ciudad) {
+      throw new Error('id_ciudad es obligatorio para registrar un reclamo.');
+    }
+
     const [result] = await db.query(
-      `INSERT INTO reclamos (titulo, descripcion, id_categoria, id_usuario, id_ciudad, id_institucion, direccion, latitud, longitud, visibilidad, estado, fecha_creacion, fecha_ultimo_cambio_estado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      `INSERT INTO reclamos (titulo, descripcion, id_categoria, id_usuario, id_ciudad, id_institucion, direccion, latitud, longitud, visibilidad, imagen, estado, fecha_creacion, fecha_ultimo_cambio_estado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         titulo || null,
         descripcion || null,
@@ -33,11 +37,13 @@ const ClaimModel = {
         latitud || null,
         longitud || null,
         visibilidad,
+        imagen || null,
         CLAIM_STATUSES.PENDIENTE
       ]
     );
     return result.insertId;
   },
+
 
   /**
    * Obtiene todos los reclamos propios del ciudadano autenticado (HU-06)
@@ -71,7 +77,9 @@ const ClaimModel = {
   /**
    * Obtiene únicamente los reclamos públicos de una ciudad determinada (HU-07)
    */
-  async getPublicosPorCiudad(idCiudad = 1) {
+  async getPublicosPorCiudad(idCiudad) {
+    if (!idCiudad) return [];
+
     const [rows] = await db.query(`
       SELECT
         r.id_reclamo     AS id,
@@ -92,11 +100,12 @@ const ClaimModel = {
       FROM reclamos r
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
       LEFT JOIN instituciones inst ON inst.id_institucion = r.id_institucion
-      WHERE r.visibilidad = 'publico' AND (r.id_ciudad = ? OR r.id_ciudad IS NULL)
+      WHERE r.visibilidad = 'publico' AND r.id_ciudad = ?
       ORDER BY r.fecha_creacion DESC
     `, [idCiudad]);
     return rows;
   },
+
 
   /**
    * Obtiene el detalle completo de un reclamo por su ID (HU-08)
@@ -156,7 +165,9 @@ const ClaimModel = {
   /**
    * Obtiene los reclamos con ubicación para el mapa público (excluyendo reclamos privados HU-02)
    */
-  async getParaMapa(idCiudad = 1) {
+  async getParaMapa(idCiudad) {
+    if (!idCiudad) return [];
+
     const [rows] = await db.query(`
       SELECT
         r.id_reclamo AS id,
@@ -170,11 +181,12 @@ const ClaimModel = {
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
       WHERE r.latitud IS NOT NULL AND r.longitud IS NOT NULL
         AND r.visibilidad = 'publico'
-        AND (r.id_ciudad = ? OR r.id_ciudad IS NULL)
+        AND r.id_ciudad = ?
       ORDER BY r.fecha_creacion DESC
     `, [idCiudad]);
     return rows;
   }
+
 };
 
 module.exports = ClaimModel;

@@ -1,8 +1,6 @@
 -- ============================================================
--- SCRIPT DE MIGRACIÓN: CONTEXTO DE CIUDAD VIALE & BACKFILL LEGACY (ReportARG)
+-- SCRIPT DE MIGRACIÓN: CONTEXTO DE CIUDAD VIALE, BACKFILL LEGACY & ESQUEMA ESTRICTO
 -- ============================================================
-
-SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. Obtener/Verificar la existencia de Viale (Entre Ríos) como ciudad activa
 INSERT INTO ciudades (nombre, provincia, activa)
@@ -33,9 +31,24 @@ UPDATE reclamos
 SET id_ciudad = @viale_id 
 WHERE id_ciudad IS NULL;
 
--- 5. Eliminar DEFAULT 1 peligrosos de la estructura permitiendo DEFAULT NULL
-ALTER TABLE usuarios MODIFY COLUMN id_ciudad INT NULL DEFAULT NULL;
-ALTER TABLE instituciones MODIFY COLUMN id_ciudad INT NULL DEFAULT NULL;
-ALTER TABLE reclamos MODIFY COLUMN id_ciudad INT NULL DEFAULT NULL;
+-- 5. Migración de comunicados legacy (si existieron instituciones que crearon filas en la tabla `reclamos`)
+INSERT INTO comunicados (id_institucion, titulo, contenido, id_categoria, fecha_publicacion, imagen)
+SELECT inst.id_institucion, r.titulo, r.descripcion, r.id_categoria, r.fecha_creacion, r.imagen
+FROM reclamos r
+INNER JOIN instituciones inst ON inst.id_usuario = r.id_usuario
+WHERE NOT EXISTS (
+    SELECT 1 FROM comunicados c WHERE c.titulo = r.titulo AND c.id_institucion = inst.id_institucion
+);
 
-SET FOREIGN_KEY_CHECKS = 1;
+DELETE r FROM reclamos r
+INNER JOIN instituciones inst ON inst.id_usuario = r.id_usuario;
+
+-- 6. Aplicación de restricciones estrictas según el modelo de datos
+-- usuarios.id_ciudad → NULL permitido (para ciudadanos en ciudades no activadas aún)
+ALTER TABLE usuarios MODIFY COLUMN id_ciudad INT NULL DEFAULT NULL;
+
+-- instituciones.id_ciudad → NOT NULL (toda institución operativa pertenece a una ciudad activa)
+ALTER TABLE instituciones MODIFY COLUMN id_ciudad INT NOT NULL;
+
+-- reclamos.id_ciudad → NOT NULL (todo reclamo pertenece a una ciudad activa)
+ALTER TABLE reclamos MODIFY COLUMN id_ciudad INT NOT NULL;

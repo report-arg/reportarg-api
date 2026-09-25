@@ -3,98 +3,152 @@ const db = require('../config/db');
 const FeedModel = {
 
   /**
-   * Obtiene las publicaciones del feed filtradas estrictamente por la ciudad activa del usuario
+   * Obtiene las publicaciones del feed combinando reclamos públicos y comunicados institucionales,
+   * filtrados estrictamente por la ciudad activa y mapeados a un DTO común.
    */
   async getFeed({ idCiudad = null, idCategoria = null, tipo = null, pagina = 1, limite = 10 } = {}) {
-    // Si el usuario no pertenece a ninguna ciudad activa, retornar lista vacía (sin errores)
     if (!idCiudad) {
       return { items: [], total: 0 };
     }
 
     const offset = (pagina - 1) * limite;
+    const includeReclamos = !tipo || tipo === 'reclamo';
+    const includeComunicados = !tipo || tipo === 'comunicado';
+
+    const queries = [];
     const params = [];
 
-    let where = `WHERE r.estado != 'Cancelado' AND r.estado != 'rechazado' 
-                 AND (r.visibilidad = 'publico' OR r.visibilidad IS NULL)
-                 AND ((inst.id_usuario IS NULL AND r.id_ciudad = ?) OR (inst.id_usuario IS NOT NULL AND inst.id_ciudad = ?))`;
-    params.push(idCiudad, idCiudad);
+    if (includeReclamos) {
+      let reclamoWhere = `WHERE r.estado != 'Cancelado' AND r.estado != 'rechazado' 
+                          AND r.visibilidad = 'publico' AND r.id_ciudad = ?`;
+      const reclamoParams = [idCiudad];
 
-    if (idCategoria) {
-      where += ` AND r.id_categoria = ?`;
-      params.push(idCategoria);
+      if (idCategoria) {
+        reclamoWhere += ` AND r.id_categoria = ?`;
+        reclamoParams.push(idCategoria);
+      }
+
+      queries.push(`
+        SELECT
+          r.id_reclamo                                    AS id,
+          'reclamo'                                       AS tipo,
+          r.id_usuario                                    AS id_usuario,
+          r.titulo                                        AS titulo,
+          r.descripcion                                   AS descripcion,
+          r.estado                                        AS estado,
+          r.direccion                                     AS direccion,
+          r.fecha_creacion                                AS fecha_creacion,
+          c.id_categoria                                  AS categoriaId,
+          c.nombre                                        AS categoriaNombre,
+          c.tipo                                          AS categoriaTipo,
+          COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), u.email) AS autorNombre,
+          ci.foto_perfil                                  AS autorFoto,
+          0                                               AS esInstitucion,
+          0                                               AS verificada,
+          r.imagen                                        AS imagen,
+          0                                               AS cantidadComentarios
+        FROM reclamos r
+        LEFT JOIN categorias c  ON c.id_categoria = r.id_categoria
+        LEFT JOIN usuarios u    ON u.id_usuario   = r.id_usuario
+        LEFT JOIN ciudadanos ci ON ci.id_usuario  = r.id_usuario
+        ${reclamoWhere}
+      `);
+      params.push(...reclamoParams);
     }
 
-    if (tipo === 'comunicado') {
-      where += ` AND inst.id_usuario IS NOT NULL`;
-    } else if (tipo === 'reclamo') {
-      where += ` AND inst.id_usuario IS NULL`;
+    if (includeComunicados) {
+      let comunicadoWhere = `WHERE inst.id_ciudad = ?`;
+      const comunicadoParams = [idCiudad];
+
+      if (idCategoria) {
+        comunicadoWhere += ` AND com.id_categoria = ?`;
+        comunicadoParams.push(idCategoria);
+      }
+
+      queries.push(`
+        SELECT
+          com.id_comunicado                               AS id,
+          'comunicado'                                    AS tipo,
+          inst.id_usuario                                 AS id_usuario,
+          com.titulo                                      AS titulo,
+          com.contenido                                   AS descripcion,
+          'Publicado'                                     AS estado,
+          NULL                                            AS direccion,
+          com.fecha_publicacion                           AS fecha_creacion,
+          c.id_categoria                                  AS categoriaId,
+          c.nombre                                        AS categoriaNombre,
+          c.tipo                                          AS categoriaTipo,
+          inst.nombre                                     AS autorNombre,
+          inst.foto_perfil                                AS autorFoto,
+          1                                               AS esInstitucion,
+          COALESCE(inst.verificada, 0)                    AS verificada,
+          com.imagen                                      AS imagen,
+          CAST((SELECT COUNT(*) FROM comentarios c_com WHERE c_com.id_reclamo = com.id_comunicado) AS UNSIGNED) AS cantidadComentarios
+        FROM comunicados com
+        INNER JOIN instituciones inst ON inst.id_institucion = com.id_institucion
+        LEFT JOIN categorias c        ON c.id_categoria   = com.id_categoria
+        ${comunicadoWhere}
+      `);
+      params.push(...comunicadoParams);
     }
+
+    if (queries.length === 0) {
+      return { items: [], total: 0 };
+    }
+
+    const unionQuery = queries.join(' UNION ALL ');
 
     const [items] = await db.query(`
-      SELECT
-        r.id_reclamo                                    AS id,
-        r.id_usuario,
-        r.titulo,
-        r.descripcion,
-        r.estado,
-        r.direccion,
-        r.fecha_creacion,
-        c.id_categoria                                  AS categoriaId,
-        c.nombre                                        AS categoriaNombre,
-        c.tipo                                          AS categoriaTipo,
-        COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), inst.nombre) AS autorNombre,
-        COALESCE(ci.foto_perfil, inst.foto_perfil)      AS autorFoto,
-        CASE WHEN inst.id_usuario IS NOT NULL THEN 1 ELSE 0 END AS esInstitucion,
-        COALESCE(inst.verificada, 0)                    AS verificada,
-        r.imagen                                        AS imagen,
-        CAST((SELECT COUNT(*) FROM comentarios WHERE id_reclamo = r.id_reclamo) AS UNSIGNED) AS cantidadComentarios
-      FROM reclamos r
-      LEFT JOIN categorias c       ON c.id_categoria   = r.id_categoria
-      LEFT JOIN usuarios u         ON u.id_usuario     = r.id_usuario
-      LEFT JOIN ciudadanos ci      ON ci.id_usuario    = r.id_usuario
-      LEFT JOIN instituciones inst ON inst.id_usuario  = r.id_usuario
-      ${where}
-      ORDER BY r.fecha_creacion DESC
+      SELECT * FROM (${unionQuery}) AS feed_combinado
+      ORDER BY fecha_creacion DESC
       LIMIT ? OFFSET ?
     `, [...params, limite, offset]);
 
     const [[{ total }]] = await db.query(`
-      SELECT COUNT(*) AS total
-      FROM reclamos r
-      LEFT JOIN instituciones inst ON inst.id_usuario = r.id_usuario
-      ${where}
+      SELECT COUNT(*) AS total FROM (${unionQuery}) AS feed_count
     `, params);
 
     return { items, total };
   },
 
   /**
-   * Obtiene tendencias de categorías filtradas estrictamente por la ciudad activa del usuario
+   * Obtiene tendencias de categorías filtradas por la ciudad activa de ReportARG,
+   * contabilizando reclamos reales y comunicados reales de sus respectivas tablas.
    */
   async getTendencias(idCiudad = null) {
     if (!idCiudad) return [];
 
     const [rows] = await db.query(`
       SELECT
-        c.id_categoria AS id,
-        c.nombre,
-        SUM(CASE WHEN inst.id_usuario IS NULL     THEN 1 ELSE 0 END) AS reclamos,
-        SUM(CASE WHEN inst.id_usuario IS NOT NULL THEN 1 ELSE 0 END) AS comunicados,
-        COUNT(r.id_reclamo) AS total
-      FROM categorias c
-      INNER JOIN reclamos r ON r.id_categoria = c.id_categoria
-        AND r.estado != 'Cancelado' AND r.estado != 'rechazado'
-      LEFT JOIN instituciones inst ON inst.id_usuario = r.id_usuario
-      WHERE c.estado = 'activo'
-        AND ((inst.id_usuario IS NULL AND r.id_ciudad = ?) OR (inst.id_usuario IS NOT NULL AND inst.id_ciudad = ?))
-      GROUP BY c.id_categoria, c.nombre
+        cat.id,
+        cat.nombre,
+        CAST(COALESCE(r_cnt.total_reclamos, 0) AS UNSIGNED)    AS reclamos,
+        CAST(COALESCE(com_cnt.total_comunicados, 0) AS UNSIGNED) AS comunicados,
+        CAST((COALESCE(r_cnt.total_reclamos, 0) + COALESCE(com_cnt.total_comunicados, 0)) AS UNSIGNED) AS total
+      FROM (
+        SELECT id_categoria AS id, nombre FROM categorias WHERE estado = 'activo'
+      ) AS cat
+      LEFT JOIN (
+        SELECT r.id_categoria, COUNT(*) AS total_reclamos
+        FROM reclamos r
+        WHERE r.estado != 'Cancelado' AND r.estado != 'rechazado'
+          AND r.visibilidad = 'publico' AND r.id_ciudad = ?
+        GROUP BY r.id_categoria
+      ) AS r_cnt ON r_cnt.id_categoria = cat.id
+      LEFT JOIN (
+        SELECT com.id_categoria, COUNT(*) AS total_comunicados
+        FROM comunicados com
+        INNER JOIN instituciones inst ON inst.id_institucion = com.id_institucion
+        WHERE inst.id_ciudad = ?
+        GROUP BY com.id_categoria
+      ) AS com_cnt ON com_cnt.id_categoria = cat.id
       HAVING total > 0
       ORDER BY total DESC
       LIMIT 5
     `, [idCiudad, idCiudad]);
+
     return rows;
   },
-
 };
 
 module.exports = FeedModel;

@@ -1,7 +1,8 @@
 const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/reclamoController');
-const { verifyToken, requireCiudadano } = require('../middlewares/authMiddleware');
+const { verifyToken, requireRole, requireCiudadano } = require('../middlewares/authMiddleware');
+const { ROLES } = require('../constants/roles');
 
 // Categorías para reclamo
 router.get('/categorias',   ctrl.categoriasParaReclamo);
@@ -18,7 +19,8 @@ router.get('/mapa',         verifyToken, ctrl.reclamosParaMapa);
 // Detalle completo del reclamo (HU-08)
 router.get('/:id',          verifyToken, ctrl.obtenerDetalle);
 
-// Crear nuevo reclamo (HU-01, HU-02, HU-03)
-router.post('/',            verifyToken, ctrl.crear);
+// Crear nuevo reclamo (solo Ciudadanos y Admin) (HU-01, HU-02, HU-03)
+router.post('/',            verifyToken, requireRole(ROLES.CIUDADANO, ROLES.ADMIN), ctrl.crear);
 
 module.exports = router;
+

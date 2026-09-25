@@ -4,6 +4,8 @@ const HistorialModel = require('../models/historialModel');
 const { resolverInstitucionAsignada } = require('../services/assignmentService');
 const { CATEGORY_TYPES, HISTORIAL_EVENTS } = require('../constants/publication');
 
+const { ROLES } = require('../constants/roles');
+
 const reclamoController = {
 
   /**
@@ -25,6 +27,7 @@ const reclamoController = {
   async crear(req, res) {
     try {
       const { titulo, descripcion, id_categoria, direccion, latitud, longitud, visibilidad } = req.body;
+      const imagen = req.body.imagen || req.body.imagen_url || null;
       const id_usuario = req.user.id;
       const id_ciudad = req.user.id_ciudad;
 
@@ -68,7 +71,7 @@ const reclamoController = {
       // 4. Auto-asignación de institución según Ciudad + Categoría con respaldo en Institución Principal de esa ciudad (HU-04, HU-05)
       const id_institucion = await resolverInstitucionAsignada(id_ciudad, id_categoria);
 
-      // 5. Creación del reclamo en BD
+      // 5. Creación del reclamo en BD (persistiendo imagen si fue subida)
       const id = await ClaimModel.crear({
         titulo: titulo.trim(),
         descripcion: descripcion.trim(),
@@ -80,6 +83,7 @@ const reclamoController = {
         latitud,
         longitud,
         visibilidad: visibilidad === 'privado' ? 'privado' : 'publico',
+        imagen,
       });
 
       // 6. Registro inmutable en auditoría/historial (HU-18)
@@ -146,9 +150,9 @@ const reclamoController = {
 
       // Restricción de seguridad para reclamos privados (HU-02 Criterios 5, 6 y 7)
       if (reclamo.visibilidad === 'privado') {
-        const esAutor = req.user.id === reclamo.id_usuario;
-        const esAdmin = req.user.rol === 'admin';
-        const esInstitucionAsignada = req.user.rol === 'institucion' && req.user.id_institucion === reclamo.id_institucion;
+        const esAutor = Number(req.user.id) === Number(reclamo.id_usuario);
+        const esAdmin = req.user.role === ROLES.ADMIN;
+        const esInstitucionAsignada = req.user.role === ROLES.INSTITUCION && Number(req.user.id_institucion) === Number(reclamo.id_institucion);
 
         if (!esAutor && !esAdmin && !esInstitucionAsignada) {
           return res.status(403).json({
@@ -173,6 +177,7 @@ const reclamoController = {
       res.status(500).json({ ok: false, mensaje: 'Error al cargar el detalle del reclamo' });
     }
   },
+
 
   /**
    * Obtiene datos de geolocalización para el mapa comunitario público
