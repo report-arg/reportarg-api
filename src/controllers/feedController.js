@@ -1,5 +1,6 @@
 const FeedModel    = require('../models/feedModel');
 const CategoryModel = require('../models/categoryModel');
+const db            = require('../config/db');
 
 const feedController = {
 
@@ -10,14 +11,26 @@ const feedController = {
       const categoria = req.query.categoria         || null;
       const tipo      = req.query.tipo              || null; // 'reclamo' | 'comunicado'
 
-      const { items, total } = await FeedModel.getFeed({ idCategoria: categoria, tipo, pagina, limite });
+      let idCiudad = null;
+
+      if (req.user) {
+        // Usuario autenticado: usar su id_ciudad (puede ser null si pertenece a una ciudad no activa)
+        idCiudad = req.user.id_ciudad;
+      } else {
+        // Usuario no autenticado / público: fallback dinámico a la ciudad activa de ReportARG
+        const [activeCities] = await db.query('SELECT id_ciudad FROM ciudades WHERE activa = 1 LIMIT 1');
+        idCiudad = activeCities[0]?.id_ciudad || null;
+      }
+
+      const { items, total } = await FeedModel.getFeed({ idCiudad, idCategoria: categoria, tipo, pagina, limite });
 
       res.json({
         ok: true,
         data: items,
         total,
         pagina,
-        totalPaginas: Math.ceil(total / limite),
+        totalPaginas: Math.ceil(total / limite) || 1,
+        mensaje: !idCiudad ? 'Tu ciudad declarada aún no cuenta con la plataforma ReportARG activa.' : undefined,
       });
     } catch (err) {
       console.error('Error feed:', err);
@@ -27,7 +40,7 @@ const feedController = {
 
   async getCategorias(req, res) {
     try {
-      const todas  = await CategoryModel.getAll();
+      const todas   = await CategoryModel.getAll();
       const activas = todas.filter(c => c.estado === 'activo');
       res.json({ ok: true, data: activas });
     } catch (err) {
@@ -38,7 +51,16 @@ const feedController = {
 
   async getTendencias(req, res) {
     try {
-      const data = await FeedModel.getTendencias();
+      let idCiudad = null;
+
+      if (req.user) {
+        idCiudad = req.user.id_ciudad;
+      } else {
+        const [activeCities] = await db.query('SELECT id_ciudad FROM ciudades WHERE activa = 1 LIMIT 1');
+        idCiudad = activeCities[0]?.id_ciudad || null;
+      }
+
+      const data = await FeedModel.getTendencias(idCiudad);
       res.json({ ok: true, data });
     } catch (err) {
       console.error('Error tendencias:', err);
@@ -48,3 +70,4 @@ const feedController = {
 };
 
 module.exports = feedController;
+

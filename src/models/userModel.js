@@ -9,16 +9,20 @@ const UserModel = {
       u.id_usuario AS id,
       u.email,
       u.tipo_usuario AS rol,
+      u.id_ciudad,
       CASE WHEN u.activo = 1 THEN 'activo' ELSE 'inactivo' END AS estado,
       u.fecha_creacion,
       COALESCE(
         CONCAT(c.nombre, ' ', c.apellido),
         i.nombre
       ) AS nombre,
-      COALESCE(c.foto_perfil, i.foto_perfil) AS foto
+      COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
+      ciud.nombre AS ciudad_activa,
+      ciud.provincia AS provincia_activa
       FROM usuarios u
       LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
       LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
+      LEFT JOIN ciudades ciud ON ciud.id_ciudad = u.id_ciudad
       WHERE 1=1
     `;
     const params = [];
@@ -41,13 +45,14 @@ const UserModel = {
     return rows;
   },
 
-  // Obtener uno por ID
+  // Obtener uno por ID con datos de ciudad activa y declarada
   async getById(id) {
     const [rows] = await db.query(`
       SELECT 
         u.id_usuario AS id,
         u.email,
         u.tipo_usuario AS rol,
+        u.id_ciudad,
         CASE WHEN u.activo = 1 THEN 'activo' ELSE 'inactivo' END AS estado,
         u.fecha_creacion,
         COALESCE(
@@ -56,20 +61,23 @@ const UserModel = {
         ) AS nombre,
         c.nombre AS nombre_ciudadano,
         c.apellido,
-        c.provincia,
-        c.ciudad,
+        c.provincia AS provincia_declarada,
+        c.ciudad AS ciudad_declarada,
+        ciud.nombre AS ciudad_activa,
+        ciud.provincia AS provincia_activa,
         c.zona,
         COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
         (SELECT COUNT(*) FROM reclamos r WHERE r.id_usuario = u.id_usuario) AS reportes
       FROM usuarios u
       LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
       LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
+      LEFT JOIN ciudades ciud ON ciud.id_ciudad = u.id_ciudad
       WHERE u.id_usuario = ?
     `, [id]);
     return rows[0] || null;
   },
 
-  // Actualizar perfil propio (nombre, email, ubicación, foto)
+  // Actualizar perfil propio
   async updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto }) {
     if (email) {
       await db.query('UPDATE usuarios SET email = ? WHERE id_usuario = ?', [email, id]);
@@ -98,23 +106,23 @@ const UserModel = {
   },
 
   // Crear usuario
-  async create({ email, password, rol, estado }) {
+  async create({ email, password, rol, estado, id_ciudad = null }) {
     const bcrypt = require('bcryptjs');
     const hash = await bcrypt.hash(password, 10);
     const [result] = await db.query(`
-    INSERT INTO usuarios (email, password, tipo_usuario, activo)
-    VALUES (?, ?, ?, ?)
-`, [email, hash, rol.toLowerCase(), estado === 'activo' ? 1 : 0]);
+      INSERT INTO usuarios (email, password, tipo_usuario, activo, id_ciudad)
+      VALUES (?, ?, ?, ?, ?)
+    `, [email, hash, rol.toLowerCase(), estado === 'activo' ? 1 : 0, id_ciudad]);
     return result.insertId;
   },
 
   // Editar usuario
-  async update(id, { email, rol, estado }) {
+  async update(id, { email, rol, estado, id_ciudad }) {
     const [result] = await db.query(`
       UPDATE usuarios
-      SET email = ?, tipo_usuario = ?, activo = ?
+      SET email = ?, tipo_usuario = ?, activo = ?, id_ciudad = ?
       WHERE id_usuario = ?
-    `, [email, rol.toLowerCase(), estado === 'activo' ? 1 : 0, id]);
+    `, [email, rol.toLowerCase(), estado === 'activo' ? 1 : 0, id_ciudad !== undefined ? id_ciudad : null, id]);
     return result.affectedRows;
   },
 

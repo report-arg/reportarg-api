@@ -26,7 +26,15 @@ const reclamoController = {
     try {
       const { titulo, descripcion, id_categoria, direccion, latitud, longitud, visibilidad } = req.body;
       const id_usuario = req.user.id;
-      const id_ciudad = req.user.id_ciudad || 1;
+      const id_ciudad = req.user.id_ciudad;
+
+      // Validación explícita de usuario sin ciudad activa
+      if (!id_ciudad) {
+        return res.status(400).json({
+          ok: false,
+          mensaje: 'No podés registrar reclamos porque tu ciudad declarada aún no se encuentra activa en ReportARG.'
+        });
+      }
 
       // 1. Validaciones de campos obligatorios
       if (!titulo || !titulo.trim()) {
@@ -57,7 +65,7 @@ const reclamoController = {
         });
       }
 
-      // 4. Auto-asignación de institución según Ciudad + Categoría con respaldo en Institución Principal (HU-04, HU-05)
+      // 4. Auto-asignación de institución según Ciudad + Categoría con respaldo en Institución Principal de esa ciudad (HU-04, HU-05)
       const id_institucion = await resolverInstitucionAsignada(id_ciudad, id_categoria);
 
       // 5. Creación del reclamo en BD
@@ -112,7 +120,10 @@ const reclamoController = {
    */
   async reclamosPublicos(req, res) {
     try {
-      const id_ciudad = req.user?.id_ciudad || 1;
+      const id_ciudad = req.user?.id_ciudad;
+      if (!id_ciudad) {
+        return res.json({ ok: true, data: [] });
+      }
       const data = await ClaimModel.getPublicosPorCiudad(id_ciudad);
       res.json({ ok: true, data });
     } catch (err) {
@@ -168,7 +179,10 @@ const reclamoController = {
    */
   async reclamosParaMapa(req, res) {
     try {
-      const id_ciudad = req.user?.id_ciudad || 1;
+      const id_ciudad = req.user?.id_ciudad;
+      if (!id_ciudad) {
+        return res.json({ ok: true, data: [] });
+      }
       const data = await ClaimModel.getParaMapa(id_ciudad);
       res.json({ ok: true, data });
     } catch (err) {
