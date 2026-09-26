@@ -180,6 +180,88 @@ const reclamoController = {
 
 
   /**
+   * Permite al autor editar su propio reclamo en estado Pendiente
+   */
+  async editar(req, res) {
+    try {
+      const { id } = req.params;
+      const { titulo, descripcion, direccion } = req.body;
+      const reclamo = await ClaimModel.getById(id);
+
+      if (!reclamo) {
+        return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
+      }
+      if (Number(reclamo.id_usuario) !== Number(req.user.id)) {
+        return res.status(403).json({ ok: false, mensaje: 'Solo el autor puede editar este reclamo' });
+      }
+      if (reclamo.estado !== 'Pendiente') {
+        return res.status(400).json({ ok: false, mensaje: 'El reclamo ya fue tomado en revisión y no puede editarse' });
+      }
+
+      const affected = await ClaimModel.editar(id, req.user.id, {
+        titulo: titulo ? titulo.trim() : reclamo.titulo,
+        descripcion: descripcion ? descripcion.trim() : reclamo.descripcion,
+        direccion: direccion ? direccion.trim() : reclamo.direccion,
+      });
+
+      if (affected > 0) {
+        await HistorialModel.registrar({
+          id_reclamo: id,
+          id_usuario: req.user.id,
+          tipo_evento: HISTORIAL_EVENTS.EDICION,
+          detalle: 'Reclamo editado por el ciudadano.',
+          estado_nuevo: 'Pendiente',
+        });
+        return res.json({ ok: true, mensaje: 'Reclamo editado correctamente.' });
+      }
+
+      res.status(400).json({ ok: false, mensaje: 'No se pudo editar el reclamo.' });
+    } catch (err) {
+      console.error('Error al editar reclamo:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error al editar reclamo' });
+    }
+  },
+
+  /**
+   * Permite al autor cancelar su propio reclamo en estado Pendiente
+   */
+  async cancelar(req, res) {
+    try {
+      const { id } = req.params;
+      const { motivo } = req.body;
+      const reclamo = await ClaimModel.getById(id);
+
+      if (!reclamo) {
+        return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
+      }
+      if (Number(reclamo.id_usuario) !== Number(req.user.id)) {
+        return res.status(403).json({ ok: false, mensaje: 'Solo el autor puede cancelar este reclamo' });
+      }
+      if (reclamo.estado !== 'Pendiente') {
+        return res.status(400).json({ ok: false, mensaje: 'El reclamo no se puede cancelar porque ya no está en estado Pendiente' });
+      }
+
+      const affected = await ClaimModel.cancelar(id, req.user.id, motivo);
+
+      if (affected > 0) {
+        await HistorialModel.registrar({
+          id_reclamo: id,
+          id_usuario: req.user.id,
+          tipo_evento: HISTORIAL_EVENTS.CANCELACION,
+          detalle: `Reclamo cancelado por el ciudadano. Motivo: ${motivo || 'Sin detalle'}`,
+          estado_nuevo: 'Cancelado',
+        });
+        return res.json({ ok: true, mensaje: 'Reclamo cancelado exitosamente.' });
+      }
+
+      res.status(400).json({ ok: false, mensaje: 'No se pudo cancelar el reclamo.' });
+    } catch (err) {
+      console.error('Error al cancelar reclamo:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error al cancelar el reclamo' });
+    }
+  },
+
+  /**
    * Obtiene datos de geolocalización para el mapa comunitario público
    */
   async reclamosParaMapa(req, res) {
