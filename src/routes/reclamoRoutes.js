@@ -22,5 +22,11 @@ router.get('/:id',          verifyToken, ctrl.obtenerDetalle);
 // Crear nuevo reclamo (solo Ciudadanos y Admin) (HU-01, HU-02, HU-03)
 router.post('/',            verifyToken, requireRole(ROLES.CIUDADANO, ROLES.ADMIN), ctrl.crear);
 
+// Editar reclamo propio (Solo en estado Pendiente)
+router.put('/:id',          verifyToken, requireCiudadano, ctrl.editar);
+
+// Cancelar reclamo propio (Solo en estado Pendiente)
+router.patch('/:id/cancelar', verifyToken, requireCiudadano, ctrl.cancelar);
+
 module.exports = router;
 
