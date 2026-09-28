@@ -39,6 +39,7 @@ const FeedModel = {
           r.direccion                                     AS direccion,
           r.fecha_creacion                                AS fecha_creacion,
           c.id_categoria                                  AS categoriaId,
+          c.codigo                                        AS categoriaCodigo,
           c.nombre                                        AS categoriaNombre,
           c.tipo                                          AS categoriaTipo,
           COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), u.email) AS autorNombre,
@@ -76,13 +77,14 @@ const FeedModel = {
           NULL                                            AS direccion,
           com.fecha_publicacion                           AS fecha_creacion,
           c.id_categoria                                  AS categoriaId,
+          c.codigo                                        AS categoriaCodigo,
           c.nombre                                        AS categoriaNombre,
           c.tipo                                          AS categoriaTipo,
           inst.nombre                                     AS autorNombre,
           inst.foto_perfil                                AS autorFoto,
           1                                               AS esInstitucion,
           COALESCE(inst.verificada, 0)                    AS verificada,
-          com.imagen                                      AS imagen,
+          NULL                                            AS imagen,
           0                                               AS cantidadComentarios
         FROM comunicados com
 
@@ -122,12 +124,13 @@ const FeedModel = {
     const [rows] = await db.query(`
       SELECT
         cat.id,
+        cat.codigo,
         cat.nombre,
         CAST(COALESCE(r_cnt.total_reclamos, 0) AS UNSIGNED)    AS reclamos,
         CAST(COALESCE(com_cnt.total_comunicados, 0) AS UNSIGNED) AS comunicados,
         CAST((COALESCE(r_cnt.total_reclamos, 0) + COALESCE(com_cnt.total_comunicados, 0)) AS UNSIGNED) AS total
       FROM (
-        SELECT id_categoria AS id, nombre FROM categorias WHERE estado = 'activo'
+        SELECT id_categoria AS id, codigo, nombre FROM categorias WHERE estado = 'activo'
       ) AS cat
       LEFT JOIN (
         SELECT r.id_categoria, COUNT(*) AS total_reclamos

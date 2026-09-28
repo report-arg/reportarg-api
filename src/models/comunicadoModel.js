@@ -4,11 +4,11 @@ const ComunicadoModel = {
   /**
    * Crea un nuevo comunicado emitido por una institución (almacenado en la tabla `comunicados`)
    */
-  async crear({ idInstitucion, titulo, contenido, idCategoria, imagen = null }) {
+  async crear({ idInstitucion, titulo, contenido, idCategoria }) {
     const [result] = await db.query(
-      `INSERT INTO comunicados (id_institucion, titulo, contenido, id_categoria, imagen, fecha_publicacion)
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [idInstitucion, titulo || null, contenido || null, idCategoria, imagen || null]
+      `INSERT INTO comunicados (id_institucion, titulo, contenido, id_categoria, fecha_publicacion)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [idInstitucion, titulo || null, contenido || null, idCategoria]
     );
     return result.insertId;
   },
@@ -22,7 +22,7 @@ const ComunicadoModel = {
         com.id_comunicado  AS id,
         com.titulo,
         com.contenido      AS descripcion,
-        com.imagen,
+        NULL               AS imagen,
         com.fecha_publicacion AS fecha_creacion,
         c.id_categoria     AS categoriaId,
         c.nombre           AS categoriaNombre,

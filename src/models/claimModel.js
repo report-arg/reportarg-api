@@ -163,6 +163,32 @@ const ClaimModel = {
   },
 
   /**
+   * Permite al autor editar su reclamo ÚNICAMENTE mientras se encuentra en estado 'Pendiente'
+   */
+  async editar(id, idUsuario, { titulo, descripcion, direccion }) {
+    const [result] = await db.query(
+      `UPDATE reclamos
+       SET titulo = ?, descripcion = ?, direccion = ?, editado = 1
+       WHERE id_reclamo = ? AND id_usuario = ? AND estado = ?`,
+      [titulo, descripcion, direccion, id, idUsuario, CLAIM_STATUSES.PENDIENTE]
+    );
+    return result.affectedRows;
+  },
+
+  /**
+   * Permite al autor cancelar su reclamo ÚNICAMENTE mientras se encuentra en estado 'Pendiente'
+   */
+  async cancelar(id, idUsuario, motivo) {
+    const [result] = await db.query(
+      `UPDATE reclamos
+       SET estado = ?, motivo_cancelacion = ?, cancelado_por_tipo = 'ciudadano', fecha_ultimo_cambio_estado = NOW()
+       WHERE id_reclamo = ? AND id_usuario = ? AND estado = ?`,
+      [CLAIM_STATUSES.CANCELADO, motivo || 'Cancelado por el ciudadano', id, idUsuario, CLAIM_STATUSES.PENDIENTE]
+    );
+    return result.affectedRows;
+  },
+
+  /**
    * Obtiene los reclamos con ubicación para el mapa público (excluyendo reclamos privados HU-02)
    */
   async getParaMapa(idCiudad) {
