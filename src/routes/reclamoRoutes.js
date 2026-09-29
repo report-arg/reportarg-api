@@ -28,5 +28,8 @@ router.put('/:id',          verifyToken, requireCiudadano, ctrl.editar);
 // Cancelar reclamo propio (Solo en estado Pendiente)
 router.patch('/:id/cancelar', verifyToken, requireCiudadano, ctrl.cancelar);
 
+// Reabrir reclamo propio (Solo Resuelto/Cancelado)
+router.patch('/:id/reabrir', verifyToken, requireCiudadano, ctrl.reabrir);
+
 module.exports = router;
 

@@ -277,6 +277,57 @@ const reclamoController = {
       res.status(500).json({ ok: false, mensaje: 'Error al obtener puntos del mapa' });
     }
   },
+  /**
+   * Permite al autor reabrir su propio reclamo en estado Resuelto o Cancelado
+   */
+  async reabrir(req, res) {
+    try {
+      const { id } = req.params;
+      const { motivo } = req.body;
+      const reclamo = await ClaimModel.getById(id);
+
+      if (!reclamo) {
+        return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
+      }
+      if (Number(reclamo.id_usuario) !== Number(req.user.id)) {
+        return res.status(403).json({ ok: false, mensaje: 'Solo el autor puede reabrir este reclamo' });
+      }
+      if (!['Resuelto', 'Cancelado'].includes(reclamo.estado)) {
+        return res.status(400).json({ ok: false, mensaje: 'El reclamo solo se puede reabrir si está Resuelto o Cancelado' });
+      }
+      if (!motivo || !motivo.trim()) {
+        return res.status(400).json({ ok: false, mensaje: 'El motivo de reapertura es obligatorio' });
+      }
+
+      // Validar que no hayan pasado más de 15 días desde la fecha_ultimo_cambio_estado
+      const fechaUltimoCambio = new Date(reclamo.fecha_ultimo_cambio_estado);
+      const diffTime = Math.abs(new Date() - fechaUltimoCambio);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 15) {
+        return res.status(400).json({ ok: false, mensaje: 'El plazo máximo de 15 días para reabrir este reclamo ha expirado' });
+      }
+
+      const affected = await ClaimModel.reabrir(id, req.user.id);
+
+      if (affected > 0) {
+        await HistorialModel.registrar({
+          id_reclamo: id,
+          id_usuario: req.user.id,
+          tipo_evento: HISTORIAL_EVENTS.REAPERTURA,
+          detalle: `Reclamo reabierto por el ciudadano. Motivo: ${motivo}`,
+          estado_anterior: reclamo.estado,
+          estado_nuevo: 'En revisión',
+        });
+        return res.json({ ok: true, mensaje: 'Reclamo reabierto exitosamente.' });
+      }
+
+      res.status(400).json({ ok: false, mensaje: 'No se pudo reabrir el reclamo.' });
+    } catch (err) {
+      console.error('Error al reabrir reclamo:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error al reabrir el reclamo' });
+    }
+  },
+
 };
 
 module.exports = reclamoController;

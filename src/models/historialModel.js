@@ -36,7 +36,7 @@ const HistorialModel = {
         h.estado_nuevo,
         h.fecha_creacion,
         COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), inst.nombre, u.email) AS autorNombre,
-        u.rol AS autorRol
+        u.tipo_usuario AS autorRol
        FROM reclamos_historial h
        LEFT JOIN usuarios u ON u.id_usuario = h.id_usuario
        LEFT JOIN ciudadanos ci ON ci.id_usuario = h.id_usuario

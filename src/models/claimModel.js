@@ -211,6 +211,76 @@ const ClaimModel = {
       ORDER BY r.fecha_creacion DESC
     `, [idCiudad]);
     return rows;
+  },
+
+  /**
+   * Permite a la institución resolver el reclamo
+   */
+  async resolver(id, idInstitucion, mensaje, evidenciaUrl = null) {
+    const [result] = await db.query(
+      `UPDATE reclamos
+       SET estado = ?, mensaje_resolucion = ?, imagen = COALESCE(?, imagen), fecha_resolucion = NOW(), fecha_ultimo_cambio_estado = NOW()
+       WHERE id_reclamo = ? AND id_institucion = ? AND estado = ?`,
+      [CLAIM_STATUSES.RESUELTO, mensaje, evidenciaUrl, id, idInstitucion, CLAIM_STATUSES.EN_PROCESO]
+    );
+    return result.affectedRows;
+  },
+
+  /**
+   * Permite a la institución cancelar el reclamo
+   */
+  async cancelarInstitucion(id, idInstitucion, motivo) {
+    const [result] = await db.query(
+      `UPDATE reclamos
+       SET estado = ?, motivo_cancelacion = ?, cancelado_por_tipo = 'institucion', fecha_ultimo_cambio_estado = NOW()
+       WHERE id_reclamo = ? AND id_institucion = ?`,
+      [CLAIM_STATUSES.CANCELADO, motivo, id, idInstitucion]
+    );
+    return result.affectedRows;
+  },
+
+  /**
+   * Permite al autor reabrir el reclamo
+   */
+  async reabrir(id, idUsuario) {
+    const [result] = await db.query(
+      `UPDATE reclamos
+       SET estado = ?, fecha_ultimo_cambio_estado = NOW()
+       WHERE id_reclamo = ? AND id_usuario = ? AND estado IN (?, ?)`,
+      [CLAIM_STATUSES.EN_REVISION, id, idUsuario, CLAIM_STATUSES.RESUELTO, CLAIM_STATUSES.CANCELADO]
+    );
+    return result.affectedRows;
+  },
+
+  /**
+   * Obtiene la bandeja de entrada para una institución (HU-09)
+   */
+  async getBandejaInstitucion(idInstitucion, estado = null) {
+    let query = `
+      SELECT
+        r.id_reclamo AS id,
+        r.titulo,
+        r.estado,
+        r.fecha_creacion,
+        r.fecha_ultimo_cambio_estado,
+        r.direccion,
+        c.nombre AS categoriaNombre,
+        (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount
+      FROM reclamos r
+      LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
+      WHERE r.id_institucion = ?
+    `;
+    const params = [idInstitucion];
+
+    if (estado) {
+      query += ` AND r.estado = ?`;
+      params.push(estado);
+    }
+
+    query += ` ORDER BY r.fecha_ultimo_cambio_estado DESC`;
+
+    const [rows] = await db.query(query, params);
+    return rows;
   }
 
 };
