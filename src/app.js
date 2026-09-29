@@ -58,6 +58,9 @@ app.use('/api/comunicados', comunicadoRoutes);
 const comentarioRoutes = require('./routes/comentarioRoutes');
 app.use('/api/comentarios', comentarioRoutes);
 
+const actividadRoutes = require('./routes/actividadRoutes');
+app.use('/api/actividad', actividadRoutes);
+
 app.use((err, req, res, next) => {
   console.error('Error no manejado:', err.message);
   res.status(err.status || 500).json({ ok: false, mensaje: err.message || 'Error interno del servidor' });
