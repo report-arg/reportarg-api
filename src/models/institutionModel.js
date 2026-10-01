@@ -40,6 +40,7 @@ const InstitutionModel = {
         i.telefono,
         i.verificada,
         i.fecha_verificacion,
+        i.id_ciudad,
         u.email,
         u.activo,
         u.id_usuario

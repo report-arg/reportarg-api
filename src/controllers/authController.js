@@ -79,7 +79,7 @@ const createTokens = (userId, email, role) => {
   const accessToken = jwt.sign(
     { id: userId, email, role: normalizedRole },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' }
+    { expiresIn: '7d' }
   );
 
   const refreshToken = jwt.sign(

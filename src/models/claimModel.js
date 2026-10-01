@@ -77,8 +77,16 @@ const ClaimModel = {
   /**
    * Obtiene únicamente los reclamos públicos de una ciudad determinada (HU-07)
    */
-  async getPublicosPorCiudad(idCiudad) {
+  async getPublicosPorCiudad(idCiudad, idUsuarioActual = null) {
     if (!idCiudad) return [];
+
+    let isAfectadoQuery = 'FALSE AS isAfectado';
+    const params = [idCiudad];
+
+    if (idUsuarioActual) {
+      isAfectadoQuery = 'EXISTS(SELECT 1 FROM reclamos_afectados ra2 WHERE ra2.id_reclamo = r.id_reclamo AND ra2.id_usuario = ?) AS isAfectado';
+      params.unshift(idUsuarioActual); // Prepend to match position in SELECT
+    }
 
     const [rows] = await db.query(`
       SELECT
@@ -92,17 +100,24 @@ const ClaimModel = {
         r.latitud,
         r.longitud,
         r.fecha_creacion,
+        r.imagen,
+        r.id_usuario,
         c.id_categoria   AS categoriaId,
         c.nombre         AS categoriaNombre,
         inst.id_institucion AS institucionId,
         inst.nombre      AS institucionNombre,
+        COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), u.email) AS autorNombre,
+        u.email          AS autorEmail,
+        ${isAfectadoQuery},
         (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount
       FROM reclamos r
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
       LEFT JOIN instituciones inst ON inst.id_institucion = r.id_institucion
+      LEFT JOIN usuarios     u    ON u.id_usuario     = r.id_usuario
+      LEFT JOIN ciudadanos   ci   ON ci.id_usuario    = r.id_usuario
       WHERE r.visibilidad = 'publico' AND r.id_ciudad = ?
       ORDER BY r.fecha_creacion DESC
-    `, [idCiudad]);
+    `, params);
     return rows;
   },
 
@@ -255,12 +270,13 @@ const ClaimModel = {
   /**
    * Obtiene la bandeja de entrada para una institución (HU-09)
    */
-  async getBandejaInstitucion(idInstitucion, estado = null) {
+  async getBandejaInstitucion(idInstitucion, estado = null, idCategoria = null, orderBy = 'recientes') {
     let query = `
       SELECT
         r.id_reclamo AS id,
         r.titulo,
         r.estado,
+        r.visibilidad,
         r.fecha_creacion,
         r.fecha_ultimo_cambio_estado,
         r.direccion,
@@ -272,15 +288,72 @@ const ClaimModel = {
     `;
     const params = [idInstitucion];
 
-    if (estado) {
+    if (estado && estado !== 'Todos') {
       query += ` AND r.estado = ?`;
       params.push(estado);
     }
+    
+    if (idCategoria && idCategoria !== 'Todas') {
+      query += ` AND r.id_categoria = ?`;
+      params.push(idCategoria);
+    }
 
-    query += ` ORDER BY r.fecha_ultimo_cambio_estado DESC`;
+    if (orderBy === 'impacto') {
+      query += ` ORDER BY afectadosCount DESC, r.fecha_ultimo_cambio_estado DESC`;
+    } else if (orderBy === 'antiguos') {
+      query += ` ORDER BY r.fecha_creacion ASC`;
+    } else {
+      query += ` ORDER BY r.fecha_ultimo_cambio_estado DESC`;
+    }
 
     const [rows] = await db.query(query, params);
     return rows;
+  },
+
+  /**
+   * Verifica si un usuario está afectado por un reclamo
+   */
+  async isAfectado(idReclamo, idUsuario) {
+    const [rows] = await db.query(
+      `SELECT 1 FROM reclamos_afectados WHERE id_reclamo = ? AND id_usuario = ?`,
+      [idReclamo, idUsuario]
+    );
+    return rows.length > 0;
+  },
+
+  /**
+   * Marca a un usuario como afectado por un reclamo
+   */
+  async marcarAfectado(idReclamo, idUsuario) {
+    const [result] = await db.query(
+      `INSERT IGNORE INTO reclamos_afectados (id_reclamo, id_usuario) VALUES (?, ?)`,
+      [idReclamo, idUsuario]
+    );
+    return result.affectedRows;
+  },
+
+  /**
+   * Quita a un usuario como afectado por un reclamo
+   */
+  async quitarAfectado(idReclamo, idUsuario) {
+    const [result] = await db.query(
+      `DELETE FROM reclamos_afectados WHERE id_reclamo = ? AND id_usuario = ?`,
+      [idReclamo, idUsuario]
+    );
+    return result.affectedRows;
+  },
+
+  /**
+   * Permite al administrador reasignar la institución responsable
+   */
+  async reasignarInstitucion(idReclamo, idNuevaInstitucion) {
+    const [result] = await db.query(
+      `UPDATE reclamos
+       SET id_institucion = ?, fecha_ultimo_cambio_estado = NOW()
+       WHERE id_reclamo = ?`,
+      [idNuevaInstitucion, idReclamo]
+    );
+    return result.affectedRows;
   }
 
 };

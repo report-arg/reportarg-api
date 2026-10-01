@@ -7,8 +7,8 @@ const institucionReclamoController = {
   async bandeja(req, res) {
     try {
       const idInstitucion = req.user.id_institucion;
-      const { estado } = req.query;
-      const data = await ClaimModel.getBandejaInstitucion(idInstitucion, estado);
+      const { estado, categoria, orderBy } = req.query;
+      const data = await ClaimModel.getBandejaInstitucion(idInstitucion, estado, categoria, orderBy);
       res.json({ ok: true, data });
     } catch (err) {
       console.error('Error al obtener bandeja institucional:', err);

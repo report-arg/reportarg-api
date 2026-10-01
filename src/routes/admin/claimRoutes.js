@@ -9,5 +9,6 @@ router.get('/por-categoria',     ctrl.porCategoria);
 router.get('/lista',             ctrl.lista);
 router.get('/:id',               ctrl.detalle);
 router.patch('/:id/estado',      ctrl.actualizarEstado);
+router.patch('/:id/institucion', ctrl.reasignarInstitucion);
 
 module.exports = router;

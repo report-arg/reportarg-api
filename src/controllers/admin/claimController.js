@@ -88,6 +88,53 @@ const claimController = {
       res.status(500).json({ ok: false, mensaje: 'Error al actualizar estado' });
     }
   },
+
+  async reasignarInstitucion(req, res) {
+    try {
+      const { id } = req.params;
+      const { id_institucion } = req.body;
+      const idUsuarioAdmin = req.user.id;
+      
+      if (!id_institucion) {
+        return res.status(400).json({ ok: false, mensaje: 'La institución destino es obligatoria' });
+      }
+
+      const reclamo = await ClaimModel.getById(id);
+      if (!reclamo) return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
+
+      const InstitutionModel = require('../../models/institutionModel');
+      const institucion = await InstitutionModel.getById(id_institucion);
+      
+      if (!institucion) return res.status(404).json({ ok: false, mensaje: 'La institución destino no existe' });
+
+      // Validar que la institucion pertenezca a la misma ciudad del reclamo
+      if (Number(institucion.id_ciudad) !== Number(reclamo.id_ciudad)) {
+        return res.status(400).json({ ok: false, mensaje: 'La institución destino debe pertenecer a la misma ciudad del reclamo' });
+      }
+
+      const instAntiguaId = reclamo.institucionId;
+      const instAntiguaNombre = reclamo.institucionNombre || 'Ninguna';
+
+      const affected = await ClaimModel.reasignarInstitucion(id, id_institucion);
+      if (!affected) return res.status(500).json({ ok: false, mensaje: 'No se pudo actualizar el reclamo' });
+
+      const HistorialModel = require('../../models/historialModel');
+      const { HISTORIAL_EVENTS } = require('../../constants/publication');
+
+      await HistorialModel.registrar({
+        id_reclamo: id,
+        id_usuario: idUsuarioAdmin,
+        tipo_evento: HISTORIAL_EVENTS.REASIGNACION,
+        detalle: `Reasignado administrativamente. Anterior: ${instAntiguaNombre} (ID ${instAntiguaId || 'N/A'}) -> Nueva: ${institucion.nombre} (ID ${id_institucion}).`,
+        estado_nuevo: reclamo.estado,
+      });
+
+      res.json({ ok: true, mensaje: 'Reclamo reasignado exitosamente' });
+    } catch (err) {
+      console.error('Error al reasignar reclamo:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error interno al reasignar institución' });
+    }
+  }
 };
 
 module.exports = claimController;

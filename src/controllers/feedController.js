@@ -12,8 +12,9 @@ const feedController = {
 
       // Resolver ciudad activa estrictamente desde el contexto del usuario autenticado
       const idCiudad  = req.user?.id_ciudad || null;
+      const idUsuarioActual = req.user?.id || null;
 
-      const { items, total } = await FeedModel.getFeed({ idCiudad, idCategoria: categoria, tipo, pagina, limite });
+      const { items, total } = await FeedModel.getFeed({ idCiudad, idCategoria: categoria, tipo, pagina, limite, idUsuarioActual });
 
       res.json({
         ok: true,

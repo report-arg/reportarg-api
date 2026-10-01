@@ -31,5 +31,11 @@ router.patch('/:id/cancelar', verifyToken, requireCiudadano, ctrl.cancelar);
 // Reabrir reclamo propio (Solo Resuelto/Cancelado)
 router.patch('/:id/reabrir', verifyToken, requireCiudadano, ctrl.reabrir);
 
+// Agregar actualización (Ciudadano o Institución)
+router.post('/:id/actualizaciones', verifyToken, ctrl.agregarActualizacion);
+
+// A mí también me pasa (HU-16)
+router.post('/:id/afectado', verifyToken, requireCiudadano, ctrl.toggleAfectado);
+
 module.exports = router;
 

@@ -29,13 +29,17 @@ const reclamoController = {
       const { titulo, descripcion, id_categoria, direccion, latitud, longitud, visibilidad } = req.body;
       const imagen = req.body.imagen || req.body.imagen_url || null;
       const id_usuario = req.user.id;
-      const id_ciudad = req.user.id_ciudad;
+      let id_ciudad = req.user.id_ciudad;
 
-      // Validación explícita de usuario sin ciudad activa
+      if (req.user.role === ROLES.ADMIN) {
+        id_ciudad = req.body.id_ciudad || id_ciudad;
+      }
+
+      // Validación explícita de usuario sin ciudad activa o seleccionada
       if (!id_ciudad) {
         return res.status(400).json({
           ok: false,
-          mensaje: 'No podés registrar reclamos porque tu ciudad declarada aún no se encuentra activa en ReportARG.'
+          mensaje: 'Se requiere especificar la ciudad para registrar el reclamo.'
         });
       }
 
@@ -125,10 +129,11 @@ const reclamoController = {
   async reclamosPublicos(req, res) {
     try {
       const id_ciudad = req.user?.id_ciudad;
+      const id_usuario = req.user?.id;
       if (!id_ciudad) {
         return res.json({ ok: true, data: [] });
       }
-      const data = await ClaimModel.getPublicosPorCiudad(id_ciudad);
+      const data = await ClaimModel.getPublicosPorCiudad(id_ciudad, id_usuario);
       res.json({ ok: true, data });
     } catch (err) {
       console.error('Error reclamos públicos:', err);
@@ -164,12 +169,21 @@ const reclamoController = {
 
       // Cargar historial inmutable del reclamo (HU-18)
       const historial = await HistorialModel.getByReclamo(id);
+      const ActualizacionModel = require('../models/actualizacionModel');
+      const actualizaciones = await ActualizacionModel.getByReclamo(id);
+      
+      let isAfectado = false;
+      if (req.user?.id) {
+        isAfectado = await ClaimModel.isAfectado(id, req.user.id);
+      }
 
       res.json({
         ok: true,
         data: {
           ...reclamo,
           historial,
+          actualizaciones,
+          isAfectado
         }
       });
     } catch (err) {
@@ -328,6 +342,82 @@ const reclamoController = {
     }
   },
 
-};
 
+  /**
+   * Permite agregar una actualización al reclamo (solo autor o institución asignada)
+   */
+  async agregarActualizacion(req, res) {
+    try {
+      const { id } = req.params;
+      const { texto } = req.body;
+      const idUsuario = req.user.id;
+      const rolUsuario = req.user.role;
+      const idInstitucionUsuario = req.user.id_institucion;
+
+      if (!texto || !texto.trim()) {
+        return res.status(400).json({ ok: false, mensaje: 'El texto de la actualización es obligatorio' });
+      }
+
+      const reclamo = await ClaimModel.getById(id);
+      if (!reclamo) return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
+
+      const esAutor = Number(idUsuario) === Number(reclamo.id_usuario);
+      const { ROLES } = require('../constants/roles');
+      const esInstitucionAsignada = rolUsuario === ROLES.INSTITUCION && Number(idInstitucionUsuario) === Number(reclamo.id_institucion);
+
+      if (!esAutor && !esInstitucionAsignada) {
+        return res.status(403).json({ ok: false, mensaje: 'Solo el autor o la institución asignada pueden agregar actualizaciones' });
+      }
+
+      const tipo_autor = esInstitucionAsignada ? 'institucion' : 'ciudadano';
+
+      const ActualizacionModel = require('../models/actualizacionModel');
+      await ActualizacionModel.crear({
+        id_reclamo: id,
+        id_usuario: idUsuario,
+        tipo_autor,
+        texto: texto.trim()
+      });
+
+      res.json({ ok: true, mensaje: 'Actualización agregada correctamente' });
+    } catch (err) {
+      console.error('Error al agregar actualización:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error al agregar la actualización' });
+    }
+  },
+
+  /**
+   * Permite a un ciudadano marcar/desmarcar "A mí también me pasa" (HU-16)
+   */
+  async toggleAfectado(req, res) {
+    try {
+      const { id } = req.params;
+      const idUsuario = req.user.id;
+
+      const reclamo = await ClaimModel.getById(id);
+      if (!reclamo) return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
+
+      // No se puede afectar si el reclamo es privado y no es el autor (aunque no deberian llegar acá)
+      if (reclamo.visibilidad === 'privado' && Number(reclamo.id_usuario) !== Number(idUsuario)) {
+        return res.status(403).json({ ok: false, mensaje: 'No puedes interactuar con un reclamo privado ajeno' });
+      }
+
+      // Check if user already marked
+      const isAfectado = await ClaimModel.isAfectado(id, idUsuario);
+      
+      if (isAfectado) {
+        await ClaimModel.quitarAfectado(id, idUsuario);
+        return res.json({ ok: true, mensaje: 'Has dejado de estar afectado por este reclamo', afectado: false });
+      } else {
+        await ClaimModel.marcarAfectado(id, idUsuario);
+        return res.json({ ok: true, mensaje: 'Has sido marcado como afectado por este reclamo', afectado: true });
+      }
+
+    } catch (err) {
+      console.error('Error al togglear afectado:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error al actualizar tu participación en el reclamo' });
+    }
+  }
+};
 module.exports = reclamoController;
+

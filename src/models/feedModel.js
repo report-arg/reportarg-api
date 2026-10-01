@@ -6,7 +6,7 @@ const FeedModel = {
    * Obtiene las publicaciones del feed combinando reclamos públicos y comunicados institucionales,
    * filtrados estrictamente por la ciudad activa y mapeados a un DTO común.
    */
-  async getFeed({ idCiudad = null, idCategoria = null, tipo = null, pagina = 1, limite = 10 } = {}) {
+  async getFeed({ idCiudad = null, idCategoria = null, tipo = null, pagina = 1, limite = 10, idUsuarioActual = null } = {}) {
     if (!idCiudad) {
       return { items: [], total: 0 };
     }
@@ -21,7 +21,15 @@ const FeedModel = {
     if (includeReclamos) {
       let reclamoWhere = `WHERE r.estado != 'Cancelado' AND r.estado != 'rechazado' 
                           AND r.visibilidad = 'publico' AND r.id_ciudad = ?`;
-      const reclamoParams = [idCiudad];
+      const reclamoParams = [];
+
+      let isAfectadoQuery = 'FALSE';
+      if (idUsuarioActual) {
+        isAfectadoQuery = 'EXISTS(SELECT 1 FROM reclamos_afectados ra2 WHERE ra2.id_reclamo = r.id_reclamo AND ra2.id_usuario = ?)';
+        reclamoParams.push(idUsuarioActual);
+      }
+      
+      reclamoParams.push(idCiudad);
 
       if (idCategoria) {
         reclamoWhere += ` AND r.id_categoria = ?`;
@@ -47,7 +55,9 @@ const FeedModel = {
           0                                               AS esInstitucion,
           0                                               AS verificada,
           r.imagen                                        AS imagen,
-          0                                               AS cantidadComentarios
+          0                                               AS cantidadComentarios,
+          ${isAfectadoQuery}                              AS isAfectado,
+          (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount
         FROM reclamos r
         LEFT JOIN categorias c  ON c.id_categoria = r.id_categoria
         LEFT JOIN usuarios u    ON u.id_usuario   = r.id_usuario
@@ -85,7 +95,9 @@ const FeedModel = {
           1                                               AS esInstitucion,
           COALESCE(inst.verificada, 0)                    AS verificada,
           NULL                                            AS imagen,
-          0                                               AS cantidadComentarios
+          0                                               AS cantidadComentarios,
+          0                                               AS isAfectado,
+          0                                               AS afectadosCount
         FROM comunicados com
 
         INNER JOIN instituciones inst ON inst.id_institucion = com.id_institucion
