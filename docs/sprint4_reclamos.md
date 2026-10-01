@@ -745,6 +745,12 @@ A continuación se presenta la tabla del **Sprint Backlog** para el Sprint 4 con
 - **Relaciones**: N a 1 con `reclamos` y `usuarios`.
 - **Campos principales**: `id_historial`, `id_reclamo`, `id_usuario`, `tipo_evento`, `detalle`, `estado_anterior`, `estado_nuevo`, `fecha_creacion`.
 
+### 6. `notificaciones` (HU-22 — Notificaciones Internas)
+- **Propósito**: Avisos y notificaciones persistentes desacopladas del ciclo del reclamo.
+- **Relaciones**: N a 1 con `usuarios` (destinatario) y N a 1 nullable con `reclamos`.
+- **Campos principales**: `id_notificacion`, `id_usuario`, `tipo`, `titulo`, `mensaje`, `id_reclamo`, `leida`, `fecha_creacion`, `fecha_lectura`.
+- **Índices**: `(id_usuario, fecha_creacion DESC)`, `(id_usuario, leida)`, `(id_reclamo)`.
+
 ---
 
 ## 🛡️ 3. Cambios de seguridad/autorización
@@ -767,6 +773,12 @@ Las siguientes reglas deben ser estrictamente validadas en el **Backend**:
 
 4. **Administrador**:
    - Permiso exclusivo para reasignar reclamos a otra institución e identificar la institución principal de una ciudad.
+
+5. **Notificaciones Internas (HU-22)**:
+   - Toda consulta y marcado de notificaciones deriva estrictamente de `req.user.id`.
+   - Un usuario solo puede acceder o modificar sus propias notificaciones (protección IDOR).
+   - Exclusión de auto-notificación: las acciones ejecutadas por el autor sobre su propio reclamo no le generan notificación.
+
 
 ---
 

@@ -17,51 +17,54 @@ app.get('/', (req, res) => {
 const setupSwagger = require('./docs/setupSwagger');
 setupSwagger(app);
 
-const authRoutes = require('./routes/authRoutes');
+const {
+  authRoutes,
+  adminUserRoutes,
+  adminProfileRoutes,
+} = require('./modules/usuarios');
+
 app.use('/api/auth', authRoutes);
 
-const profileRoutes = require('./routes/profileRoutes');
-const uploadRoutes = require('./routes/admin/uploadRoutes');
+const { uploadRoutes, searchRoutes } = require('./modules/admin');
 
-app.use('/api/admin/usuarios/me', verifyToken, profileRoutes);
+app.use('/api/admin/usuarios/me', verifyToken, adminProfileRoutes);
 app.use('/api/admin/upload', verifyToken, uploadRoutes);
+
+const { notificationRoutes } = require('./modules/notificaciones');
+app.use('/api/notificaciones', verifyToken, notificationRoutes);
 
 app.use('/api/admin', verifyToken, requireAdmin);
 
-const userRoutes = require('./routes/admin/userRoutes');
-app.use('/api/admin/usuarios', userRoutes);
+app.use('/api/admin/usuarios', adminUserRoutes);
 
-const categoryRoutes = require('./routes/admin/categoryRoutes');
+const { categoryRoutes } = require('./modules/categorias');
 app.use('/api/admin/categorias', categoryRoutes);
 
-const institutionRoutes = require('./routes/admin/institutionRoutes');
+const { institutionRoutes } = require('./modules/instituciones');
 app.use('/api/admin/instituciones', institutionRoutes);
 
-const claimRoutes = require('./routes/admin/claimRoutes');
-app.use('/api/admin/reclamos', claimRoutes);
+const adminReclamoRoutes = require('./modules/reclamos/routes/adminReclamoRoutes');
+app.use('/api/admin/reclamos', adminReclamoRoutes);
 
-const searchRoutes = require('./routes/admin/searchRoutes');
 app.use('/api/admin/buscar', searchRoutes);
 
-const notificationRoutes = require('./routes/admin/notificationRoutes');
 app.use('/api/admin/notificaciones', notificationRoutes);
 
-const feedRoutes = require('./routes/feedRoutes');
+const { feedRoutes, actividadRoutes } = require('./modules/feed');
 app.use('/api/feed', feedRoutes);
 
-const reclamoRoutes = require('./routes/reclamoRoutes');
+const reclamoRoutes = require('./modules/reclamos/routes/reclamoRoutes');
 app.use('/api/reclamos', reclamoRoutes);
 
-const comunicadoRoutes = require('./routes/comunicadoRoutes');
+const { comunicadoRoutes } = require('./modules/comunicados');
 app.use('/api/comunicados', comunicadoRoutes);
 
-const comentarioRoutes = require('./routes/comentarioRoutes');
+const { comentarioRoutes } = require('./modules/comentarios');
 app.use('/api/comentarios', comentarioRoutes);
 
-const actividadRoutes = require('./routes/actividadRoutes');
 app.use('/api/actividad', actividadRoutes);
 
-const institucionReclamoRoutes = require('./routes/institucion/reclamoRoutes');
+const institucionReclamoRoutes = require('./modules/reclamos/routes/institucionReclamoRoutes');
 app.use('/api/institucion/reclamos', institucionReclamoRoutes);
 
 app.use((err, req, res, next) => {

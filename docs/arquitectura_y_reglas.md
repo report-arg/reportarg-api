@@ -1685,3 +1685,4 @@ migraciones necesarias.
 | 2026-09-30 | Ciudad de residencia y ciudad seleccionada son conceptos diferentes | Separar pertenencia territorial de navegación. |
 | 2026-09-30 | Cambiar de residencia no modifica reclamos históricos | Preservar trazabilidad territorial. |
 | 2026-09-30 | El cambio de residencia tendrá controles específicos | Evitar el uso del cambio de residencia para eludir restricciones territoriales. |
+| 2026-10-01 | Notificaciones internas desacopladas y seguras (HU-22) | Avisos persistentes al ciudadano sin realtime pesado ni auto-notificaciones con derivación estricta de identidad desde el token. |

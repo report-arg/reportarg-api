@@ -112,9 +112,14 @@ describe('Seguridad y control de acceso', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.data).toEqual([
-        { id: 101, titulo: 'Reclamo del usuario A', estado: 'recibido' },
-      ]);
+      // Verificar que solo se devuelven los reclamos del usuario del JWT (id A),
+      // independientemente del query param ?usuario=B
+      expect(res.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 101, titulo: 'Reclamo del usuario A', estado: 'recibido' }),
+        ])
+      );
+      expect(res.body.data).toHaveLength(1);
     });
   });
 

@@ -1,0 +1,16 @@
+/**
+ * Constantes semánticas de tipos de notificación para el sistema interno (HU-22)
+ */
+const NOTIFICATION_TYPES = Object.freeze({
+  CLAIM_STATUS_CHANGED: 'CLAIM_STATUS_CHANGED',
+  CLAIM_RESOLVED: 'CLAIM_RESOLVED',
+  CLAIM_CANCELLED: 'CLAIM_CANCELLED',
+  CLAIM_UPDATE: 'CLAIM_UPDATE',
+  CLAIM_REASSIGNED: 'CLAIM_REASSIGNED',
+  CLAIM_REOPENED: 'CLAIM_REOPENED',
+  GENERAL: 'GENERAL',
+});
+
+module.exports = {
+  NOTIFICATION_TYPES,
+};

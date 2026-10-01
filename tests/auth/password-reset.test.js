@@ -9,6 +9,11 @@ jest.mock('../../src/config/db', () => ({
   })),
 }));
 
+jest.mock('../../src/services/emailService', () => ({
+  enviarCodigoVerificacion: jest.fn(),
+  enviarRecuperacionPassword: jest.fn(),
+}));
+
 jest.mock('../../src/config/emailService', () => ({
   enviarCodigoVerificacion: jest.fn(),
   enviarRecuperacionPassword: jest.fn(),
@@ -18,7 +23,7 @@ const jwt = require('jsonwebtoken');
 const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/config/db');
-const emailService = require('../../src/config/emailService');
+const emailService = require('../../src/services/emailService');
 
 const TEST_EMAIL = 'ciudadano@test.com';
 const resetSecret = () => process.env.JWT_RESET_SECRET || process.env.JWT_SECRET;

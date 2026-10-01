@@ -19,8 +19,8 @@ const app = require('../../src/app');
 const db = require('../../src/config/db');
 const { generateTestToken, ROLES } = require('../helpers/auth');
 const cityService = require('../../src/services/cityService');
-const { resolverInstitucionAsignada } = require('../../src/services/assignmentService');
-const InstitutionModel = require('../../src/models/institutionModel');
+const { resolverInstitucionAsignada } = require('../../src/modules/reclamos/services/assignmentService');
+const InstitutionModel = require('../../src/modules/instituciones/institutionModel');
 
 describe('Pruebas de Aislamiento Territorial y Reglas de Negocio', () => {
 

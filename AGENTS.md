@@ -4,7 +4,7 @@ Este archivo se aplica a todo el repositorio. Antes de editar, revisá la solici
 
 ## Contexto y fuentes
 
-La API usa Express, CommonJS y MySQL mediante `mysql2`. El recorrido habitual de una petición es `src/routes/` → `src/controllers/` → `src/services/` cuando hay lógica de dominio → `src/models/` para persistencia.
+La API usa Express, CommonJS y MySQL mediante `mysql2`. El código está organizado por dominios en `src/modules/<dominio>/` (rutas → controladores → servicios de dominio → modelos). Para lógica e infraestructura transversal se utilizan `src/services/`, `src/middlewares/` y `src/config/`.
 
 Consultá según el cambio:
 
@@ -24,11 +24,11 @@ Consultá según el cambio:
 4. Mantené el aislamiento por ciudad en feed, reclamos, comunicados, mapa y consultas institucionales. No fijes Viale ni `id_ciudad = 1` en la lógica de ejecución; el backfill histórico no es una regla de negocio.
 5. Conservá la separación entre reclamos y comunicados. Los reclamos privados no deben aparecer en consultas públicas, mapas ni respuestas para usuarios sin permiso.
 6. Para reclamos, respetá la máquina de estados, las reglas de edición, cancelación, reapertura e historial que estén implementadas y documentadas. Consultá el código actual antes de modificar una transición. No inventes permisos o estados nuevos.
-7. La asignación de una institución depende de ciudad y categoría, con respaldo en la institución principal de esa misma ciudad. Reutilizá `src/services/assignmentService.js`; no dupliques la búsqueda en controladores.
+7. La asignación de una institución depende de ciudad y categoría, con respaldo en la institución principal de esa misma ciudad. Reutilizá `src/modules/reclamos/services/assignmentService.js`; no dupliques la búsqueda en controladores.
 8. Usá consultas parametrizadas. Si una operación modifica varias tablas que deben permanecer consistentes, evaluá una transacción y asegurá rollback ante error. Registrá los eventos de historial exigidos por el flujo.
 9. Conservá los contratos de respuesta existentes o actualizá de forma coordinada sus consumidores. No cambies nombres de campos, rutas o semántica de errores sin revisar frontend, pruebas y documentación.
 10. Validá entradas en el servidor y devolvé mensajes adecuados sin exponer credenciales, tokens, detalles SQL ni datos privados en respuestas o logs.
-11. **Consistencia de firmas:** Si modificás la firma de un método en `src/models/` (por ejemplo, agregando un nuevo filtro o parámetro), es obligatorio que revises todos los `src/controllers/` que lo invocan para asegurarte de que estén enviando los argumentos correctamente. Un parámetro olvidado en el controlador puede romper silenciosamente la consulta.
+11. **Consistencia de firmas:** Si modificás la firma de un método en los modelos de un módulo (por ejemplo, agregando un nuevo filtro o parámetro), es obligatorio que revises todos los controladores que lo invocan para asegurarte de que estén enviando los argumentos correctamente. Un parámetro olvidado en el controlador puede romper silenciosamente la consulta.
 
 ## Base de datos y pruebas
 

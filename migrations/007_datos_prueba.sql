@@ -12,7 +12,7 @@ WHERE u.email != 'juli.ciudadano@reportarg.com' AND u.tipo_usuario = 'ciudadano'
 
 -- 2. CREACIÓN DE NUEVOS CIUDADANOS (Valen, Ludmi y Juan Perez)
 -- Hash para "Admin123!"
-SET @password_hash = '$2b$10$g8rbuJjHXgIHle74Hfy4HeWUP5X2DSOG1BjclqFDwncQawrpXH21y';
+SET @password_hash = '$2b$10$VqBngmIKUQlmh/hWIVanauTmyCEQTpj.L5U45dmvFhDVfNNRCk8ya';
 
 -- Valen Ciudadano
 INSERT INTO usuarios (email, password, tipo_usuario, id_ciudad, activo, email_verified) 

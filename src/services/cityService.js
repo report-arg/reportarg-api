@@ -4,6 +4,14 @@ const db = require('../config/db');
  * Servicio centralizado para resolución territorial y ciudades activas.
  */
 const cityService = {
+  async getActiveById(id) {
+    const [rows] = await db.query('SELECT id_ciudad, nombre, provincia FROM ciudades WHERE id_ciudad = ? AND activa = 1', [id]);
+    return rows[0] || null;
+  },
+  async listActive() {
+    const [rows] = await db.query('SELECT id_ciudad AS id, nombre, provincia FROM ciudades WHERE activa = 1 ORDER BY provincia, nombre');
+    return rows;
+  },
   /**
    * Busca el ID de una ciudad activa en ReportARG a partir del nombre y provincia.
    * Exige coincidencia exacta de nombre + provincia cuando se provee provincia,
