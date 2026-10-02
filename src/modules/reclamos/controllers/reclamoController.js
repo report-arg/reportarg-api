@@ -3,11 +3,14 @@ const ClaimModel    = require('../models/reclamoModel');
 const HistorialModel = require('../models/historialModel');
 const ActualizacionModel = require('../models/actualizacionModel');
 const NotificationService = require('../../notificaciones/notificationService');
+const { NOTIFICATION_TYPES } = require('../../notificaciones/notifications.constants');
 const { resolverInstitucionAsignada } = require('../services/assignmentService');
 const { CATEGORY_TYPES, HISTORIAL_EVENTS, CLAIM_STATUSES } = require('../../../constants/publication');
 
 const { ROLES } = require('../../../constants/roles');
 const { filtrosReclamo } = require('../services/claimFilterService');
+const cityService = require('../../../services/cityService');
+const InstitutionModel = require('../../instituciones/institutionModel');
 
 const reclamoController = {
 
@@ -49,7 +52,6 @@ const reclamoController = {
       if (!Number.isSafeInteger(Number(id_ciudad)) || Number(id_ciudad) <= 0) {
         return res.status(400).json({ ok: false, mensaje: 'La ciudad seleccionada es inválida' });
       }
-      const cityService = require('../services/cityService');
       if (!await cityService.getActiveById(Number(id_ciudad))) {
         return res.status(400).json({ ok: false, mensaje: 'La ciudad seleccionada no existe o no está activa' });
       }
@@ -112,13 +114,33 @@ const reclamoController = {
       });
 
       // 6. Registro inmutable en auditoría/historial (HU-18)
+      let institucionAsignadaNombre = null;
+      if (id_institucion) {
+        const inst = await InstitutionModel.getById(id_institucion);
+        institucionAsignadaNombre = inst?.nombre || null;
+      }
+
+      const detalleAsignacion = institucionAsignadaNombre
+        ? `Asignado a ${institucionAsignadaNombre}.`
+        : (id_institucion ? 'Asignado a institución responsable.' : 'Sin institución asignada.');
+
       await HistorialModel.registrar({
         id_reclamo: id,
         id_usuario,
         tipo_evento: HISTORIAL_EVENTS.CREACION,
-        detalle: `Reclamo creado por ${req.user.role === ROLES.ADMIN ? 'administrador' : 'ciudadano'} como ${visibilidad === 'privado' ? 'privado' : 'público'}. Asignado a institución ID ${id_institucion || 'Sin asignar'}.`,
+        detalle: `Reclamo creado por ${req.user.role === ROLES.ADMIN ? 'administrador' : 'ciudadano'} como ${visibilidad === 'privado' ? 'privado' : 'público'}. ${detalleAsignacion}`,
         estado_nuevo: 'Pendiente',
       });
+
+      // 7. Notificar a la institución responsable asignada (HU-22)
+      if (id_institucion) {
+        await NotificationService.notificarAsignacionInstitucional({
+          idReclamo: id,
+          idInstitucion: id_institucion,
+          tituloReclamo: titulo.trim(),
+          actorId: id_usuario,
+        });
+      }
 
       res.status(201).json({
         ok: true,
@@ -361,6 +383,22 @@ const reclamoController = {
           estado_anterior: reclamo.estado,
           estado_nuevo: estadoDestino,
         });
+
+        // Notificar a la institución asignada sobre la reapertura (HU-22)
+        if (reclamo.id_institucion) {
+          const InstitutionModel = require('../../instituciones/institutionModel');
+          const inst = await InstitutionModel.getById(reclamo.id_institucion);
+          if (inst && inst.id_usuario) {
+            await NotificationService.notificarReapertura({
+              idReclamo: id,
+              idUsuarioDestino: inst.id_usuario,
+              tituloReclamo: reclamo.titulo,
+              actorId: req.user.id,
+              estadoNuevo: estadoDestino,
+            });
+          }
+        }
+
         return res.json({ ok: true, mensaje: 'Reclamo reabierto exitosamente.', estado: estadoDestino });
       }
 
@@ -373,7 +411,10 @@ const reclamoController = {
 
 
   /**
-   * Permite agregar una actualización al reclamo (solo autor o institución asignada)
+   * Permite agregar una actualización al reclamo (HU-17)
+   * - En estado 'Pendiente': solo el ciudadano creador puede publicar actualizaciones.
+   * - A partir de 'En revisión': solo la institución responsable asignada puede publicar actualizaciones.
+   * - En estados terminales ('Resuelto', 'Cancelado'): bloqueado.
    */
   async agregarActualizacion(req, res) {
     try {
@@ -390,13 +431,32 @@ const reclamoController = {
       const reclamo = await ClaimModel.getById(id);
       if (!reclamo) return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
 
+      // No se permiten actualizaciones en estados terminales
+      if ([CLAIM_STATUSES.RESUELTO, CLAIM_STATUSES.CANCELADO].includes(reclamo.estado)) {
+        return res.status(400).json({ ok: false, mensaje: 'No se pueden agregar actualizaciones a un reclamo resuelto o cancelado' });
+      }
+
       const esAutor = Number(idUsuario) === Number(reclamo.id_usuario);
-      const { ROLES } = require('../constants/roles');
-const { filtrosReclamo } = require('../services/claimFilterService');
       const esInstitucionAsignada = rolUsuario === ROLES.INSTITUCION && Number(idInstitucionUsuario) === Number(reclamo.id_institucion);
 
-      if (!esAutor && !esInstitucionAsignada) {
-        return res.status(403).json({ ok: false, mensaje: 'Solo el autor o la institución asignada pueden agregar actualizaciones' });
+      // Reglas de negocio para actualizaciones:
+      // 1. Mientras el reclamo está 'Pendiente', solo el creador del reclamo puede publicar actualizaciones.
+      // 2. Una vez que el reclamo pasa a 'En revisión' o posterior, solo la institución responsable asignada puede publicar actualizaciones.
+      if (reclamo.estado === CLAIM_STATUSES.PENDIENTE) {
+        if (!esAutor) {
+          return res.status(403).json({
+            ok: false,
+            mensaje: 'Solo el creador del reclamo puede publicar actualizaciones mientras está pendiente',
+          });
+        }
+      } else {
+        // En revisión, En proceso, etc.
+        if (!esInstitucionAsignada) {
+          return res.status(403).json({
+            ok: false,
+            mensaje: 'Una vez que el reclamo pasa a revisión, solo la institución responsable puede publicar actualizaciones',
+          });
+        }
       }
 
       const tipo_autor = esInstitucionAsignada ? 'institucion' : 'ciudadano';
@@ -408,7 +468,7 @@ const { filtrosReclamo } = require('../services/claimFilterService');
         texto: texto.trim()
       });
 
-      // Notificar al ciudadano autor si la actualización fue agregada por la institución (HU-22)
+      // Notificar según quién realiza la actualización (HU-22)
       if (tipo_autor === 'institucion') {
         await NotificationService.notificarActualizacion({
           idReclamo: id,
@@ -417,6 +477,18 @@ const { filtrosReclamo } = require('../services/claimFilterService');
           texto: texto.trim(),
           actorId: idUsuario,
         });
+      } else if (tipo_autor === 'ciudadano' && reclamo.id_institucion) {
+        const InstitutionModel = require('../../instituciones/institutionModel');
+        const inst = await InstitutionModel.getById(reclamo.id_institucion);
+        if (inst && inst.id_usuario) {
+          await NotificationService.notificarActualizacionCiudadano({
+            idReclamo: id,
+            idUsuarioDestino: inst.id_usuario,
+            tituloReclamo: reclamo.titulo,
+            texto: texto.trim(),
+            actorId: idUsuario,
+          });
+        }
       }
 
       res.json({ ok: true, mensaje: 'Actualización agregada correctamente' });
@@ -470,6 +542,21 @@ const { filtrosReclamo } = require('../services/claimFilterService');
         return res.json({ ok: true, mensaje: 'Has dejado de estar afectado por este reclamo', afectado: false });
       } else {
         await ClaimModel.marcarAfectado(id, idUsuario);
+
+        // Notificar al creador del reclamo (HU-16 / Notificaciones)
+        if (reclamo.id_usuario && Number(reclamo.id_usuario) !== Number(idUsuario)) {
+          try {
+            await NotificationService.notificarApoyoComunitario({
+              idReclamo: reclamo.id || reclamo.id_reclamo || id,
+              idUsuarioAutor: reclamo.id_usuario,
+              tituloReclamo: reclamo.titulo,
+              actorId: idUsuario,
+            });
+          } catch (notifErr) {
+            console.warn('No se pudo enviar notificación de apoyo comunitario:', notifErr.message);
+          }
+        }
+
         return res.json({ ok: true, mensaje: 'Has sido marcado como afectado por este reclamo', afectado: true });
       }
 

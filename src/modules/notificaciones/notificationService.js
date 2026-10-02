@@ -108,6 +108,21 @@ const NotificationService = {
   },
 
   /**
+   * Notifica a la institución asignada cuando el ciudadano autor agrega novedades en estado pendiente.
+   */
+  async notificarActualizacionCiudadano({ idReclamo, idUsuarioDestino, tituloReclamo, texto, actorId }, connection = null) {
+    const resumen = texto && texto.length > 80 ? `${texto.slice(0, 77)}...` : (texto || '');
+    return this.crear({
+      idUsuarioDestino,
+      actorId,
+      tipo: NOTIFICATION_TYPES.CLAIM_UPDATE,
+      titulo: 'Nueva actualización del ciudadano',
+      mensaje: `El autor del reclamo "${tituloReclamo || 'Reclamo'}" agregó novedades: "${resumen}"`,
+      idReclamo,
+    }, connection);
+  },
+
+  /**
    * Notifica al autor cuando la administración reasigna la institución responsable.
    */
   async notificarReasignacion({ idReclamo, idUsuarioAutor, tituloReclamo, nombreInstitucionDestino, actorId }, connection = null) {
@@ -133,6 +148,53 @@ const NotificationService = {
       tipo: NOTIFICATION_TYPES.CLAIM_REOPENED,
       titulo: 'Reclamo reabierto',
       mensaje: `El reclamo "${tituloReclamo || 'Reclamo'}" fue reabierto y ${detalleEstado}`,
+      idReclamo,
+    }, connection);
+  },
+
+  /**
+   * Notifica a la institución responsable cuando se le asigna un reclamo nuevo o reasignado (HU-22).
+   */
+  async notificarAsignacionInstitucional({ idReclamo, idInstitucion, idUsuarioInstitucion = null, tituloReclamo, actorId = null, motivo = null }, connection = null) {
+    if (!idInstitucion && !idUsuarioInstitucion) return null;
+    try {
+      let idUsuarioDestino = idUsuarioInstitucion;
+      if (!idUsuarioDestino) {
+        const dbClient = connection || require('../../config/db');
+        const [[institucion]] = await dbClient.query(
+          'SELECT id_usuario, nombre FROM instituciones WHERE id_institucion = ?',
+          [idInstitucion]
+        );
+        if (!institucion || !institucion.id_usuario) return null;
+        idUsuarioDestino = institucion.id_usuario;
+      }
+
+      const detalleMotivo = motivo ? ` Motivo: ${motivo}` : '';
+      return await this.crear({
+        idUsuarioDestino,
+        actorId,
+        tipo: NOTIFICATION_TYPES.CLAIM_ASSIGNED,
+        titulo: 'Nuevo reclamo asignado',
+        mensaje: `Se ha asignado el reclamo "${tituloReclamo || 'Reclamo'}" a tu institución para su gestión.${detalleMotivo}`,
+        idReclamo,
+      }, connection);
+    } catch (err) {
+      if (connection) throw err;
+      console.warn('Advertencia en NotificationService al notificar asignación institucional:', err.message);
+      return null;
+    }
+  },
+
+  /**
+   * Notifica al autor del reclamo cuando un vecino indica "A mí también me pasa" (apoyo comunitario)
+   */
+  async notificarApoyoComunitario({ idReclamo, idUsuarioAutor, tituloReclamo, actorId }, connection = null) {
+    return this.crear({
+      idUsuarioDestino: idUsuarioAutor,
+      actorId,
+      tipo: NOTIFICATION_TYPES.CLAIM_SUPPORT,
+      titulo: 'Nuevo apoyo a tu reclamo',
+      mensaje: `Un vecino indicó que también le pasa en tu reclamo "${tituloReclamo || 'Reclamo'}".`,
       idReclamo,
     }, connection);
   },

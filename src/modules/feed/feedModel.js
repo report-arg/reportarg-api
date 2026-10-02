@@ -57,7 +57,8 @@ const FeedModel = {
           r.imagen                                        AS imagen,
           0                                               AS cantidadComentarios,
           ${isAfectadoQuery}                              AS isAfectado,
-          (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount
+          (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount,
+          (SELECT COUNT(*) FROM reclamos_actualizaciones rac WHERE rac.id_reclamo = r.id_reclamo) AS actualizacionesCount
         FROM reclamos r
         LEFT JOIN categorias c  ON c.id_categoria = r.id_categoria
         LEFT JOIN usuarios u    ON u.id_usuario   = r.id_usuario
@@ -97,7 +98,8 @@ const FeedModel = {
           com.imagen                                      AS imagen,
           0                                               AS cantidadComentarios,
           0                                               AS isAfectado,
-          0                                               AS afectadosCount
+          0                                               AS afectadosCount,
+          0                                               AS actualizacionesCount
         FROM comunicados com
 
         INNER JOIN instituciones inst ON inst.id_institucion = com.id_institucion

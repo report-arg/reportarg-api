@@ -919,19 +919,22 @@ Se registra automáticamente la fecha de resolución.
 
 # 30. Reapertura
 
-El ciudadano creador puede reabrir un reclamo Resuelto o Cancelado cuando
-se cumplan las reglas establecidas por el módulo.
+El ciudadano creador puede reabrir un reclamo Resuelto o Cancelado dentro de
+un plazo máximo de 15 días posteriores al cierre, cuando se cumplan las reglas
+establecidas por el módulo.
 
-La reapertura reutiliza el mismo reclamo.
+Reglas del flujo de reapertura (HU-15):
 
-NO crea un reclamo duplicado.
-
-Debe registrarse como un nuevo evento dentro de su historial.
-
-Otros ciudadanos no pueden reabrir reclamos ajenos.
-
-Las restricciones temporales específicas se encuentran documentadas en
-`docs/sprint4_reclamos.md`.
+- La reapertura reutiliza la misma instancia del reclamo (conserva ID e historial previo).
+- NO crea un reclamo duplicado.
+- Requiere un motivo de justificación obligatorio.
+- Debe realizarse dentro de los 15 días corridos desde `fecha_ultimo_cambio_estado`.
+- **Determinación dinámica del estado de destino:**
+  - Si el reclamo fue cancelado voluntariamente por el ciudadano desde estado `Pendiente`, regresa a estado `Pendiente` (limpiando `motivo_cancelacion` y `cancelado_por_tipo`).
+  - Si el reclamo fue resuelto o cancelado por la institución responsable, regresa a estado `En revisión`.
+- Se registra de forma inmutable un nuevo evento `REAPERTURA` en el historial de auditoría con el `estado_nuevo` correspondiente.
+- Se notifica internamente a la institución responsable asignada (`CLAIM_REOPENED`), reincorporando el reclamo a su bandeja de gestión activa.
+- Otros ciudadanos o instituciones no pueden reabrir reclamos ajenos (403).
 
 ---
 
@@ -940,19 +943,17 @@ Las restricciones temporales específicas se encuentran documentadas en
 Los ciudadanos pueden indicar que también se encuentran afectados por un
 reclamo público de su ciudad.
 
-Cada ciudadano puede adherirse una sola vez y posteriormente retirar su
-adhesión.
+Reglas de la funcionalidad (HU-16):
 
-La cantidad de afectados funciona como indicador de impacto.
-
-No está disponible para:
-
-- reclamos privados;
-- visitantes de otra ciudad;
-- instituciones.
-
-Utilizar esta funcionalidad NO concede derechos de gestión sobre el
-reclamo.
+- Cada ciudadano puede adherirse una sola vez y posteriormente retirar su adhesión (mecanismo toggle atómico).
+- La cantidad de afectados funciona como indicador de impacto comunitario.
+- **Restricciones estrictas validadas en backend:**
+  - Exclusivo para usuarios autenticados con rol `ciudadano`.
+  - Debe coincidir la ciudad operativa del usuario con la ciudad del reclamo (`req.user.id_ciudad === reclamo.id_ciudad`). Los visitantes no pueden votar.
+  - No está disponible para reclamos privados.
+  - El propio creador del reclamo no puede adherirse a su propio reclamo.
+  - No está permitido en reclamos en estados terminales (`Resuelto`, `Cancelado`).
+- Utilizar esta funcionalidad NO concede derechos de gestión sobre el reclamo.
 
 ---
 
@@ -961,12 +962,24 @@ reclamo.
 El ciudadano creador y la institución responsable pueden agregar
 actualizaciones relacionadas con la evolución del reclamo.
 
-Las actualizaciones funcionan como una bitácora.
+Las actualizaciones funcionan como una bitácora cronológica inmutable.
 
-NO constituyen comentarios públicos.
+NO constituyen comentarios públicos ni foros de discusión.
 
 No se debe reutilizar el sistema de comentarios de Comunicados para esta
 funcionalidad.
+
+Reglas de permisos por máquina de estados (HU-17):
+
+- **Estado `Pendiente`:**
+  - Únicamente el ciudadano creador puede publicar actualizaciones o aportar nuevos datos.
+  - Al publicarse, se notifica automáticamente a la institución asignada para mantenerla informada de los nuevos aportes.
+  - Instituciones y terceros tienen prohibida la publicación mientras el reclamo esté pendiente (403).
+- **Estados `En revisión` y `En proceso`:**
+  - Únicamente la institución responsable asignada puede publicar actualizaciones institucionales de gestión y avances de cuadrilla.
+  - El ciudadano creador ya no puede publicar (se le informa en la interfaz que el caso se encuentra en gestión del organismo).
+- **Estados terminales (`Resuelto` y `Cancelado`):**
+  - No se permiten nuevas actualizaciones por ningún rol (400).
 
 ---
 
@@ -1025,7 +1038,9 @@ Pueden crear comunicados:
 
 Los ciudadanos NO pueden crear comunicados.
 
-Cada comunicado debe mantener identificada a la institución emisora.
+Cada comunicado debe mantener identificada a la institución emisora y admite
+de manera nativa una imagen ilustrativa opcional (`imagen`), accesible y visible
+tanto en el feed público de la comunidad como en la vista de detalle.
 
 Reclamos y Comunicados permanecen separados tanto conceptual como
 relacionalmente.
@@ -1686,3 +1701,11 @@ migraciones necesarias.
 | 2026-09-30 | Cambiar de residencia no modifica reclamos históricos | Preservar trazabilidad territorial. |
 | 2026-09-30 | El cambio de residencia tendrá controles específicos | Evitar el uso del cambio de residencia para eludir restricciones territoriales. |
 | 2026-10-01 | Notificaciones internas desacopladas y seguras (HU-22) | Avisos persistentes al ciudadano sin realtime pesado ni auto-notificaciones con derivación estricta de identidad desde el token. |
+| 2026-10-02 | Soporte de imagen en Comunicados | Permitir a las instituciones asociar imágenes ilustrativas a sus comunicados oficiales, persistidas en BD (`009_comunicados_imagen.sql`) y expuestas en el feed. |
+| 2026-10-02 | Determinación dinámica de estado en Reapertura (HU-15) | Si el reclamo fue cancelado por el ciudadano desde Pendiente, regresa a Pendiente; si fue resuelto o cancelado por institución, regresa a En revisión. |
+| 2026-10-02 | Reglas de participación en "A mí también me pasa" (HU-16) | Exclusivo de ciudadanos con coincidencia de ciudad operativa (`id_ciudad`), bloqueado en reclamos privados, autoría propia y estados terminales. |
+| 2026-10-02 | Notificaciones institucionales de asignación y reapertura (HU-22) | Notificación interna `CLAIM_ASSIGNED` a la institución ante creación y reasignación administrativa, y `CLAIM_REOPENED` ante reapertura. |
+| 2026-10-02 | Ventanas de publicación de actualizaciones por estado (HU-17) | En estado Pendiente solo el autor ciudadano puede publicar novedades (notificando a la institución); a partir de En revisión solo la institución asignada puede actualizar la bitácora. |
+| 2026-10-02 | Notificación de apoyo vecinal `CLAIM_SUPPORT` (HU-16/HU-22) | Se despacha automáticamente una notificación interna al creador del reclamo cuando un vecino marca "A mí también me pasa". |
+| 2026-10-02 | Visualización y acceso a actualizaciones en el feed y simplificación de UI | Exposición de `actualizacionesCount` en feed/reclamos con botón directo "Actualizaciones {N}" en cada card, y simplificación del texto de avisos a "Ver reclamo" sin `#ID`. |
+| 2026-10-02 | Línea de estados interactiva institucional y erradicación de confirm/alert | Reemplazo del botón único por una línea de tiempo secuencial interactiva (`Pendiente` → `En revisión` → `En proceso` → `Resuelto`) con acción directa clickeable en el paso siguiente, modales accesibles y feedback mediante Sonner toasts sin diálogos nativos del navegador. |

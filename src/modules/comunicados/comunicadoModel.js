@@ -49,6 +49,26 @@ const ComunicadoModel = {
     );
     return result.affectedRows;
   },
+
+  /**
+   * Actualiza un comunicado perteneciente a la institución
+   */
+  async actualizar(idComunicado, idInstitucion, { titulo, contenido, idCategoria, imagen }) {
+    const params = [titulo, contenido, idCategoria];
+    let query = `
+      UPDATE comunicados
+      SET titulo = ?, contenido = ?, id_categoria = ?
+    `;
+    if (imagen !== undefined) {
+      query += `, imagen = ?`;
+      params.push(imagen);
+    }
+    query += ` WHERE id_comunicado = ? AND id_institucion = ?`;
+    params.push(idComunicado, idInstitucion);
+
+    const [result] = await db.query(query, params);
+    return result.affectedRows;
+  },
 };
 
 module.exports = ComunicadoModel;

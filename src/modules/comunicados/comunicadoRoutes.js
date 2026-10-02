@@ -6,6 +6,7 @@ const { verifyToken, requireInstitucion } = require('../../middlewares/authMiddl
 router.get('/categorias',      ctrl.categorias);
 router.get('/mis-comunicados', verifyToken, requireInstitucion, ctrl.misComunicados);
 router.post('/',               verifyToken, requireInstitucion, ctrl.crear);
+router.put('/:id',            verifyToken, requireInstitucion, ctrl.editar);
 router.delete('/:id',          verifyToken, requireInstitucion, ctrl.eliminar);
 
 module.exports = router;

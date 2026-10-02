@@ -139,4 +139,38 @@ describe('Seguridad y control de acceso', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('PUT /api/comunicados/:id', () => {
+    test('sin token → 401', async () => {
+      const res = await request(app).put('/api/comunicados/1').send({ titulo: 'Test edit' });
+      expect(res.status).toBe(401);
+    });
+
+    test('token de ciudadano → 403', async () => {
+      const token = generateTestToken(ROLES.CIUDADANO, 1);
+      const res = await request(app)
+        .put('/api/comunicados/1')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ titulo: 'Test edit' });
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('DELETE /api/comunicados/:id', () => {
+    test('sin token → 401', async () => {
+      const res = await request(app).delete('/api/comunicados/1');
+      expect(res.status).toBe(401);
+    });
+
+    test('token de ciudadano → 403', async () => {
+      const token = generateTestToken(ROLES.CIUDADANO, 1);
+      const res = await request(app)
+        .delete('/api/comunicados/1')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
 });
+

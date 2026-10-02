@@ -488,28 +488,30 @@ A continuación se presenta la tabla del **Sprint Backlog** para el Sprint 4 con
 
 ### HU-15 — Reabrir reclamo
 
-> **Descripción**: Como ciudadano creador, quiero reabrir un reclamo resuelto o cancelado (dentro de los 15 días posteriores) indicando un motivo obligatorio, para informar que el problema persiste.
+> **Descripción**: Como ciudadano creador, quiero reabrir un reclamo resuelto o cancelado (dentro de los 15 días posteriores) indicando un motivo obligatorio, para informar que el problema persiste o solicitar su reapertura.
 
 #### 📌 Criterios de Aceptación
 1. Dado que el ciudadano es el creador de un reclamo en estado "Resuelto" o "Cancelado", cuando accede al detalle, entonces el sistema muestra la opción de reabrirlo.
-2. Dado que el ciudadano selecciona la opción de reabrir, cuando confirma la acción, entonces el sistema solicita un motivo de reapertura.
-3. Dado que el ciudadano ingresa un motivo válido, cuando confirma la reapertura, entonces el sistema cambia el reclamo a estado "En revisión".
-4. Dado que un reclamo es reabierto, cuando el sistema registra la operación, entonces conserva la misma instancia y el historial anterior.
-5. Dado que un reclamo es reabierto, cuando la institución consulta sus reclamos, entonces el reclamo vuelve a estar disponible para su gestión.
-6. Dado que un usuario distinto al creador intenta reabrir un reclamo, cuando solicita la operación, entonces el sistema la rechaza.
-7. Dado que transcurrieron más de 15 días desde la resolución o cancelación de un reclamo, cuando el ciudadano accede a su detalle, entonces el sistema deshabilita la opción de reabrir e informa que el plazo máximo expiró.
+2. Dado que el ciudadano selecciona la opción de reabrir, cuando confirma la acción, entonces el sistema solicita un motivo de justificación obligatorio.
+3. Dado que el ciudadano ingresa un motivo válido, cuando confirma la reapertura:
+   - Si el reclamo fue cancelado voluntariamente por el ciudadano desde estado "Pendiente", el sistema regresa el reclamo a estado "Pendiente" y limpia los campos de motivo y autor de cancelación.
+   - Si el reclamo fue resuelto o cancelado por la institución responsable, el sistema regresa el reclamo a estado "En revisión".
+4. Dado que un reclamo es reabierto, cuando el sistema registra la operación, entonces conserva la misma instancia, su ID y su historial anterior, registrando el nuevo evento en auditoría (`REAPERTURA`).
+5. Dado que un reclamo es reabierto, cuando se procesa la reapertura, entonces el sistema notifica internamente a la institución responsable asignada (`CLAIM_REOPENED`) y el reclamo vuelve a estar disponible en su bandeja institucional.
+6. Dado que un usuario distinto al creador intenta reabrir un reclamo, cuando solicita la operación, entonces el sistema la rechaza (403).
+7. Dado que transcurrieron más de 15 días desde la resolución o cancelación de un reclamo (medido por `fecha_ultimo_cambio_estado`), cuando el ciudadano accede a su detalle, entonces el sistema deshabilita la opción de reabrir e informa que el plazo máximo expiró.
 
 #### 🛠️ Subtareas técnicas
 
-- Implementar servicio backend para reapertura de reclamos Resueltos o Cancelados (validando plazo máximo de 15 días desde la resolución), requiriendo motivo obligatorio de reapertura y cambiando el estado a En revisión sobre la misma instancia
+- Implementar servicio backend para reapertura de reclamos Resueltos o Cancelados (validando ventana de 15 días y titularidad), resolviendo dinámicamente si regresa a Pendiente o En revisión, limpiando metadatos de cancelación, registrando historial y notificando a la institución asignada.
   + Rol: Dev
   + Hs estimadas: 4.5 hs
 
-- Diseñar e implementar botón y modal de reapertura en frontend para el ciudadano creador con campo de justificación obligatorio
+- Diseñar e implementar botón y modal de reapertura en frontend para el ciudadano creador con campo de justificación obligatorio y validación de plazo.
   + Rol: UX / Dev
   + Hs estimadas: 3.5 hs
 
-- Pruebas de reapertura comprobando conservación de ID e historial, límite de 15 días y reingreso a la bandeja institucional
+- Pruebas de reapertura comprobando conservación de ID e historial, límite de 15 días, reingreso a la bandeja institucional y notificaciones.
   + Rol: QA
   + Hs estimadas: 2 hs
 
@@ -520,23 +522,27 @@ A continuación se presenta la tabla del **Sprint Backlog** para el Sprint 4 con
 > **Descripción**: Como ciudadano, quiero indicar o quitar "A mí también me pasa" en reclamos públicos de mi ciudad para cuantificar a los afectados.
 
 #### 📌 Criterios de Aceptación
-1. Dado que un ciudadano visualiza un reclamo público, cuando selecciona "A mí también me pasa", entonces el sistema registra su participación en el reclamo.
+1. Dado que un ciudadano autenticado visualiza un reclamo público de su misma ciudad operativa (`id_ciudad`), cuando selecciona "A mí también me pasa", entonces el sistema registra su participación en el reclamo.
 2. Dado que un ciudadano ya indicó "A mí también me pasa" en un reclamo, cuando intenta registrarlo nuevamente, entonces el sistema evita duplicar su participación.
-3. Dado que un ciudadano ya indicó que también está afectado, cuando selecciona nuevamente la opción, entonces el sistema permite quitar su participación.
+3. Dado que un ciudadano ya indicó que también está afectado, cuando selecciona nuevamente la opción, entonces el sistema permite quitar su participación (toggle atómico).
 4. Dado que existen ciudadanos que indicaron que también están afectados, cuando se visualiza el reclamo, entonces el sistema muestra la cantidad total de afectados.
-5. Dado que un ciudadano visualiza un reclamo privado, cuando consulta sus acciones disponibles, entonces no se muestra la opción "A mí también me pasa".
+5. Dado que un usuario visualiza un reclamo privado, cuando consulta sus acciones disponibles, entonces el sistema no permite ni muestra la opción "A mí también me pasa".
+6. Dado que un ciudadano explora una ciudad diferente en modo visitante o no tiene coincidencia de ciudad operativa con el reclamo, cuando intenta indicar adhesión, entonces el sistema rechaza la operación (403).
+7. Dado que el usuario es el propio autor del reclamo o el reclamo se encuentra en estado terminal ("Resuelto" o "Cancelado"), entonces el sistema bloquea la acción de adhesión (solo informativa).
+8. La interacción está restringida exclusivamente a cuentas con rol `ciudadano`.
+9. Dado que un vecino indica "A mí también me pasa", el sistema despacha automáticamente una notificación interna (`CLAIM_SUPPORT`) al autor del reclamo informándole del apoyo comunitario recibido.
 
 #### 🛠️ Subtareas técnicas
 
-- Implementar servicio backend para indicar o quitar adhesión a un reclamo público, impidiendo apoyos duplicados y ocultando la opción en reclamos privados
+- Implementar servicio backend para indicar o quitar adhesión a un reclamo público, impidiendo apoyos duplicados y bloqueando reclamos privados, modo visitante, autoría propia y estados terminales.
   + Rol: Dev
   + Hs estimadas: 5.5 hs
 
-- Diseñar e implementar componente interactivo toggle "A mí también me pasa" con contador en vivo de personas afectadas en tarjetas y detalle
+- Diseñar e implementar componente interactivo toggle "A mí también me pasa" con contador en vivo de personas afectadas en tarjetas y detalle.
   + Rol: UX / Dev
   + Hs estimadas: 3.5 hs
 
-- Pruebas de suma y quita de adhesión y comprobación de restricción en reclamos privados
+- Pruebas de suma y quita de adhesión y comprobación de restricciones de seguridad (ciudad, rol, privacidad y estados).
   + Rol: QA
   + Hs estimadas: 1.5 hs
 
@@ -544,27 +550,27 @@ A continuación se presenta la tabla del **Sprint Backlog** para el Sprint 4 con
 
 ### HU-17 — Agregar actualizaciones al reclamo
 
-> **Descripción**: Como ciudadano creador o institución responsable, quiero agregar actualizaciones para dar seguimiento al reclamo.
+> **Descripción**: Como ciudadano creador (mientras está pendiente) o institución responsable (a partir de la revisión), quiero agregar actualizaciones para dar seguimiento y aportar novedades a la bitácora del reclamo.
 
 #### 📌 Criterios de Aceptación
-1. Dado que el ciudadano es el creador de un reclamo, cuando accede a su detalle, entonces el sistema le permite agregar una actualización.
-2. Dado que una institución tiene asignado un reclamo, cuando accede a su detalle, entonces el sistema le permite agregar una actualización.
-3. Dado que un usuario autorizado escribe una actualización, cuando la confirma, entonces el sistema registra el contenido, autor y fecha.
-4. Dado que existen varias actualizaciones, cuando se visualizan, entonces el sistema las muestra ordenadas cronológicamente.
-5. Dado que un usuario no autorizado intenta agregar una actualización, cuando envía la solicitud, entonces el sistema rechaza la operación.
-6. Dado que una actualización fue registrada, cuando se consulta el reclamo, entonces el sistema permite identificar si fue realizada por el ciudadano o por la institución.
+1. Dado que el reclamo se encuentra en estado "Pendiente", cuando el ciudadano creador accede a su detalle, entonces el sistema le permite agregar actualizaciones con detalles complementarios. Al registrarla, se notifica a la institución asignada.
+2. Dado que el reclamo se encuentra en estado "Pendiente", cuando un usuario que no es el autor o una institución intenta publicar una actualización, entonces el sistema rechaza la operación (403).
+3. Dado que el reclamo pasó a estado "En revisión" o "En proceso", cuando la institución responsable asignada accede a su detalle, entonces el sistema le permite publicar actualizaciones institucionales de avance.
+4. Dado que el reclamo pasó a estado "En revisión" o "En proceso", cuando el ciudadano creador o terceros intentan agregar una actualización, entonces el sistema rechaza la operación (403) e informa que la gestión de novedades corresponde al organismo.
+5. Dado que un reclamo se encuentra en estado terminal ("Resuelto" o "Cancelado"), cuando cualquier usuario intenta agregar una actualización, entonces el sistema bloquea la operación (400).
+6. Dado que existen varias actualizaciones registradas, cuando se visualizan en el detalle, entonces el sistema las muestra ordenadas cronológicamente identificando si el autor es el ciudadano o la institución.
 
 #### 🛠️ Subtareas técnicas
 
-- Implementar servicio backend para agregar novedades permitiendo publicación únicamente al ciudadano creador o a la institución asignada
+- Implementar servicio backend para agregar novedades en la bitácora según la máquina de estados (autor en Pendiente, institución en En revisión/En proceso, bloqueo en terminales) y despacho de notificaciones a contrapartes.
   + Rol: Dev
   + Hs estimadas: 5.5 hs
 
-- Diseñar e implementar módulo de bitácora en la vista de detalle con formulario de publicación y lista cronológica de novedades diferenciando autor
+- Diseñar e implementar formulario condicional de bitácora en la vista de detalle de ciudadano e institución con mensajes informativos de contexto.
   + Rol: UX / Dev
   + Hs estimadas: 4 hs
 
-- Pruebas de publicación de actualizaciones y bloqueo a usuarios no autorizados
+- Pruebas automatizadas de permisos por rol y estado para publicación de actualizaciones.
   + Rol: QA
   + Hs estimadas: 1.5 hs
 
@@ -681,28 +687,33 @@ A continuación se presenta la tabla del **Sprint Backlog** para el Sprint 4 con
 
 ---
 
-### HU-22 — Notificaciones internas de cambio de estado
+### HU-22 — Notificaciones internas (Cambios de estado, asignación institucional, novedades y reapertura)
 
-> **Descripción**: Como ciudadano creador, quiero recibir una notificación en la plataforma cuando la institución cambie el estado de mi reclamo o agregue una resolución/actualización, para hacer un seguimiento en tiempo real.
+> **Descripción**: Como ciudadano o institución responsable, quiero recibir notificaciones internas en la plataforma ante novedades, cambios de estado o asignaciones de reclamos, para hacer seguimiento oportuno y desacoplado.
 
 #### 📌 Criterios de Aceptación
-1. Dado que una institución modifica el estado, resuelve o cancela un reclamo, cuando se confirma la operación, entonces el sistema genera automáticamente una notificación para el ciudadano creador.
-2. Dado que el ciudadano accede al sistema, cuando posee notificaciones no leídas, entonces el sistema muestra un indicador visual con el número de alertas pendientes.
-3. Dado que el ciudadano selecciona una notificación, cuando accede a ella, entonces el sistema lo redirige al detalle del reclamo correspondiente y marca la notificación como leída.
+1. Dado que una institución modifica el estado, resuelve o cancela un reclamo, cuando se confirma la operación, entonces el sistema genera automáticamente una notificación interna para el ciudadano creador (`CLAIM_STATUS_CHANGED`, `CLAIM_RESOLVED`, `CLAIM_CANCELLED`).
+2. Dado que se crea un reclamo con institución asignada o un administrador reasigna la institución responsable, cuando se impacta la asignación, entonces el sistema genera automáticamente una notificación interna para la institución receptora (`CLAIM_ASSIGNED`).
+3. Dado que un ciudadano creador reabre un reclamo resuelto o cancelado, cuando se confirma la reapertura, entonces el sistema notifica automáticamente a la institución asignada (`CLAIM_REOPENED`).
+4. Dado que la institución o el ciudadano publican una actualización válida en la bitácora del reclamo, cuando se guarda, entonces el sistema notifica a la contraparte interesada (`CLAIM_UPDATE`).
+5. Dado que un vecino indica "A mí también me pasa", el sistema notifica automáticamente al autor del reclamo sobre el apoyo comunitario recibido (`CLAIM_SUPPORT`).
+6. Dado que un usuario accede al sistema (ciudadano o institución), cuando posee notificaciones no leídas, entonces el sistema muestra un indicador visual numérico en la campana de notificaciones.
+7. Dado que el usuario selecciona una notificación, cuando hace clic en ella, entonces el sistema la marca como leída y lo redirige dinámicamente al detalle del reclamo correspondiente según su rol (`/institucion/reclamos/${id}` o `/ciudadano/reclamos/${id}`).
+8. El sistema aplica la regla de exclusión de auto-notificación: si el autor de la acción coincide con el destinatario, la notificación no se genera.
 
 #### 🛠️ Subtareas técnicas
 
-- Implementar desencadenante en backend para crear automáticamente un registro en las notificaciones cuando la institución modifique el estado, cancele o resuelva un reclamo
+- Implementar servicio centralizado `NotificationService` en backend con soporte transaccional y reglas de exclusión de auto-notificación para eventos de cambio de estado, resolución, cancelación, actualización, reapertura y asignación/reasignación institucional.
   + Rol: Dev
-  + Hs estimadas: 3.5 hs
+  + Hs estimadas: 4.5 hs
 
-- Diseñar e implementar componente visual de notificaciones in-app con contador de no leídas y enlace directo al detalle del reclamo
+- Diseñar e implementar componentes visuales `NotificationBell` y `NotificationListView` en frontend con polling no intrusivo, filtros, íconos semánticos por tipo y redirección contextual según rol.
   + Rol: UX / Dev
-  + Hs estimadas: 4 hs
+  + Hs estimadas: 4.5 hs
 
-- Pruebas de generación de notificaciones automáticas y actualización de lecturas
+- Pruebas de integración de despacho de notificaciones a ciudadanos e instituciones, comprobando reglas de seguridad (aislamiento IDOR) y marcado masivo de leídas.
   + Rol: QA
-  + Hs estimadas: 1.5 hs
+  + Hs estimadas: 2 hs
 
 ---
 

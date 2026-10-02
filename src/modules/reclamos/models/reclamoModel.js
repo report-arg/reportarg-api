@@ -66,7 +66,9 @@ const ClaimModel = {
         c.id_categoria   AS categoriaId,
         c.nombre         AS categoriaNombre,
         inst.id_institucion AS institucionId,
-        inst.nombre      AS institucionNombre
+        inst.nombre      AS institucionNombre,
+        (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount,
+        (SELECT COUNT(*) FROM reclamos_actualizaciones rac WHERE rac.id_reclamo = r.id_reclamo) AS actualizacionesCount
       FROM reclamos r
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
       LEFT JOIN instituciones inst ON inst.id_institucion = r.id_institucion
@@ -114,7 +116,8 @@ const ClaimModel = {
         COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), u.email) AS autorNombre,
         u.email          AS autorEmail,
         ${isAfectadoQuery},
-        (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount
+        (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount,
+        (SELECT COUNT(*) FROM reclamos_actualizaciones rac WHERE rac.id_reclamo = r.id_reclamo) AS actualizacionesCount
       FROM reclamos r
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
       LEFT JOIN instituciones inst ON inst.id_institucion = r.id_institucion
@@ -152,15 +155,18 @@ const ClaimModel = {
         r.fecha_resolucion,
         r.fecha_ultimo_cambio_estado,
         r.fecha_creacion,
+        r.imagen,
         r.id_usuario,
         c.id_categoria   AS categoriaId,
         c.nombre         AS categoriaNombre,
         c.descripcion    AS categoriaDesc,
         inst.id_institucion AS institucionId,
         inst.nombre      AS institucionNombre,
+        inst.es_principal AS institucionEsPrincipal,
         COALESCE(CONCAT(ci.nombre, ' ', ci.apellido), u.email) AS autorNombre,
         u.email          AS autorEmail,
-        (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount
+        (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount,
+        (SELECT COUNT(*) FROM reclamos_actualizaciones rac WHERE rac.id_reclamo = r.id_reclamo) AS actualizacionesCount
       FROM reclamos r
       LEFT JOIN categorias   c    ON c.id_categoria   = r.id_categoria
       LEFT JOIN usuarios     u    ON u.id_usuario     = r.id_usuario
@@ -376,8 +382,8 @@ const ClaimModel = {
         detalle: `Institución anterior ID ${reclamo.id_institucion || 'Sin asignar'} -> nueva ${institucion.nombre} (ID ${idNuevaInstitucion}). Motivo: ${motivo || 'Intervención administrativa'}`,
         estado_anterior: reclamo.estado, estado_nuevo: reclamo.estado }, connection);
 
+      const NotificationService = require('../../notificaciones/notificationService');
       if (reclamo.id_usuario) {
-        const NotificationService = require('../../notificaciones/notificationService');
         await NotificationService.notificarReasignacion({
           idReclamo,
           idUsuarioAutor: reclamo.id_usuario,
@@ -386,6 +392,14 @@ const ClaimModel = {
           actorId: idAdmin,
         }, connection);
       }
+
+      await NotificationService.notificarAsignacionInstitucional({
+        idReclamo,
+        idInstitucion: idNuevaInstitucion,
+        tituloReclamo: reclamo.titulo,
+        actorId: idAdmin,
+        motivo,
+      }, connection);
 
       await connection.commit();
       return 1;

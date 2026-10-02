@@ -175,6 +175,111 @@ describe('HU-22: Sistema de Notificaciones Internas', () => {
       expect(res).toBeNull();
       expect(mockInsert).not.toHaveBeenCalled();
     });
+
+    test('5a. Crear notificación CLAIM_ASSIGNED a la institución cuando se le asigna un reclamo', async () => {
+      let insertParams = null;
+      db.query.mockImplementation(async (sql, params) => {
+        if (typeof sql === 'string' && sql.includes('FROM instituciones')) {
+          return [[{ id_usuario: 50, nombre: 'Obras Públicas' }]];
+        }
+        if (typeof sql === 'string' && sql.includes('INSERT INTO notificaciones')) {
+          insertParams = params;
+          return [{ insertId: 105 }];
+        }
+        return [[]];
+      });
+
+      const res = await NotificationService.notificarAsignacionInstitucional({
+        idReclamo: 45,
+        idInstitucion: 12,
+        tituloReclamo: 'Bache profundo',
+        actorId: 1, // Ciudadano creador
+      });
+
+      expect(res).toBe(105);
+      expect(insertParams[0]).toBe(50); // id_usuario institucional
+      expect(insertParams[1]).toBe(NOTIFICATION_TYPES.CLAIM_ASSIGNED);
+      expect(insertParams[2]).toBe('Nuevo reclamo asignado');
+      expect(insertParams[3]).toContain('Bache profundo');
+      expect(insertParams[4]).toBe(45);
+    });
+
+    test('5b. Crear notificación CLAIM_ASSIGNED con motivo ante reasignación administrativa', async () => {
+      let insertParams = null;
+      db.query.mockImplementation(async (sql, params) => {
+        if (typeof sql === 'string' && sql.includes('FROM instituciones')) {
+          return [[{ id_usuario: 60, nombre: 'Luminarias y Redes' }]];
+        }
+        if (typeof sql === 'string' && sql.includes('INSERT INTO notificaciones')) {
+          insertParams = params;
+          return [{ insertId: 106 }];
+        }
+        return [[]];
+      });
+
+      const res = await NotificationService.notificarAsignacionInstitucional({
+        idReclamo: 45,
+        idInstitucion: 15,
+        tituloReclamo: 'Corte de cableado',
+        actorId: 99, // Admin
+        motivo: 'Competencia operativa exclusiva',
+      });
+
+      expect(res).toBe(106);
+      expect(insertParams[0]).toBe(60);
+      expect(insertParams[1]).toBe(NOTIFICATION_TYPES.CLAIM_ASSIGNED);
+      expect(insertParams[3]).toContain('Competencia operativa exclusiva');
+    });
+
+    test('5c. Crear notificación CLAIM_REOPENED ante reapertura de reclamo', async () => {
+      let insertParams = null;
+      db.query.mockImplementation(async (sql, params) => {
+        if (typeof sql === 'string' && sql.includes('INSERT INTO notificaciones')) {
+          insertParams = params;
+          return [{ insertId: 107 }];
+        }
+        return [[]];
+      });
+
+      const res = await NotificationService.notificarReapertura({
+        idReclamo: 45,
+        idUsuarioDestino: 50,
+        tituloReclamo: 'Bache mal reparado',
+        actorId: 1,
+        estadoNuevo: 'En revisión',
+      });
+
+      expect(res).toBe(107);
+      expect(insertParams[0]).toBe(50);
+      expect(insertParams[1]).toBe(NOTIFICATION_TYPES.CLAIM_REOPENED);
+      expect(insertParams[2]).toBe('Reclamo reabierto');
+      expect(insertParams[3]).toContain('volvió a revisión');
+    });
+
+    test('5d. Crear notificación CLAIM_SUPPORT al autor ante apoyo vecinal ("A mí también me pasa")', async () => {
+      let insertParams = null;
+      db.query.mockImplementation(async (sql, params) => {
+        if (typeof sql === 'string' && sql.includes('INSERT INTO notificaciones')) {
+          insertParams = params;
+          return [{ insertId: 108 }];
+        }
+        return [[]];
+      });
+
+      const res = await NotificationService.notificarApoyoComunitario({
+        idReclamo: 45,
+        idUsuarioAutor: 1,
+        tituloReclamo: 'Semáforo intermitente',
+        actorId: 2, // Vecino que se adhiere
+      });
+
+      expect(res).toBe(108);
+      expect(insertParams[0]).toBe(1); // Creador del reclamo
+      expect(insertParams[1]).toBe(NOTIFICATION_TYPES.CLAIM_SUPPORT);
+      expect(insertParams[2]).toBe('Nuevo apoyo a tu reclamo');
+      expect(insertParams[3]).toContain('Semáforo intermitente');
+      expect(insertParams[4]).toBe(45);
+    });
   });
 
   describe('2. Endpoints y Seguridad (API /api/notificaciones)', () => {
