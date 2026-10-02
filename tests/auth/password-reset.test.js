@@ -106,6 +106,7 @@ describe('Recuperación de contraseña', () => {
     });
 
     test('si falla el envío de mail → 500', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       db.query.mockResolvedValueOnce([[mockUser()]]);
       emailService.enviarRecuperacionPassword.mockRejectedValueOnce(new Error('SMTP down'));
 
@@ -115,6 +116,7 @@ describe('Recuperación de contraseña', () => {
 
       expect(res.status).toBe(500);
       expect(res.body.error).toMatch(/servidor/i);
+      consoleSpy.mockRestore();
     });
   });
 
