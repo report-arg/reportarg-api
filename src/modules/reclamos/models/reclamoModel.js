@@ -264,12 +264,12 @@ const ClaimModel = {
   /**
    * Permite al autor reabrir el reclamo
    */
-  async reabrir(id, idUsuario) {
+  async reabrir(id, idUsuario, nuevoEstado = CLAIM_STATUSES.EN_REVISION) {
     const [result] = await db.query(
       `UPDATE reclamos
-       SET estado = ?, fecha_ultimo_cambio_estado = NOW()
+       SET estado = ?, motivo_cancelacion = NULL, cancelado_por_tipo = NULL, fecha_ultimo_cambio_estado = NOW()
        WHERE id_reclamo = ? AND id_usuario = ? AND estado IN (?, ?)`,
-      [CLAIM_STATUSES.EN_REVISION, id, idUsuario, CLAIM_STATUSES.RESUELTO, CLAIM_STATUSES.CANCELADO]
+      [nuevoEstado, id, idUsuario, CLAIM_STATUSES.RESUELTO, CLAIM_STATUSES.CANCELADO]
     );
     return result.affectedRows;
   },

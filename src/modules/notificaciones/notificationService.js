@@ -125,13 +125,14 @@ const NotificationService = {
   /**
    * Notifica cuando un reclamo es reabierto.
    */
-  async notificarReapertura({ idReclamo, idUsuarioDestino, tituloReclamo, actorId }, connection = null) {
+  async notificarReapertura({ idReclamo, idUsuarioDestino, tituloReclamo, actorId, estadoNuevo = 'En revisión' }, connection = null) {
+    const detalleEstado = estadoNuevo === 'Pendiente' ? 'volvió a estado Pendiente.' : 'volvió a revisión.';
     return this.crear({
       idUsuarioDestino,
       actorId,
       tipo: NOTIFICATION_TYPES.CLAIM_REOPENED,
       titulo: 'Reclamo reabierto',
-      mensaje: `El reclamo "${tituloReclamo || 'Reclamo'}" fue reabierto y volvió a revisión.`,
+      mensaje: `El reclamo "${tituloReclamo || 'Reclamo'}" fue reabierto y ${detalleEstado}`,
       idReclamo,
     }, connection);
   },

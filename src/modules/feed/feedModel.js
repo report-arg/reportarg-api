@@ -94,7 +94,7 @@ const FeedModel = {
           inst.foto_perfil                                AS autorFoto,
           1                                               AS esInstitucion,
           COALESCE(inst.verificada, 0)                    AS verificada,
-          NULL                                            AS imagen,
+          com.imagen                                      AS imagen,
           0                                               AS cantidadComentarios,
           0                                               AS isAfectado,
           0                                               AS afectadosCount

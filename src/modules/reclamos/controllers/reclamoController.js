@@ -4,7 +4,7 @@ const HistorialModel = require('../models/historialModel');
 const ActualizacionModel = require('../models/actualizacionModel');
 const NotificationService = require('../../notificaciones/notificationService');
 const { resolverInstitucionAsignada } = require('../services/assignmentService');
-const { CATEGORY_TYPES, HISTORIAL_EVENTS } = require('../../../constants/publication');
+const { CATEGORY_TYPES, HISTORIAL_EVENTS, CLAIM_STATUSES } = require('../../../constants/publication');
 
 const { ROLES } = require('../../../constants/roles');
 const { filtrosReclamo } = require('../services/claimFilterService');
@@ -342,7 +342,15 @@ const reclamoController = {
         return res.status(400).json({ ok: false, mensaje: 'El plazo máximo de 15 días para reabrir este reclamo ha expirado' });
       }
 
-      const affected = await ClaimModel.reabrir(id, req.user.id);
+      // Determinar estado de destino según cómo fue cerrado:
+      // Si fue cancelado voluntariamente por el ciudadano desde 'Pendiente', debe volver a 'Pendiente'.
+      // Si fue resuelto o cancelado por la institución, debe volver a 'En revisión'.
+      let estadoDestino = CLAIM_STATUSES.EN_REVISION;
+      if (reclamo.estado === CLAIM_STATUSES.CANCELADO && reclamo.cancelado_por_tipo === 'ciudadano') {
+        estadoDestino = CLAIM_STATUSES.PENDIENTE;
+      }
+
+      const affected = await ClaimModel.reabrir(id, req.user.id, estadoDestino);
 
       if (affected > 0) {
         await HistorialModel.registrar({
@@ -351,9 +359,9 @@ const reclamoController = {
           tipo_evento: HISTORIAL_EVENTS.REAPERTURA,
           detalle: `Reclamo reabierto por el ciudadano. Motivo: ${motivo}`,
           estado_anterior: reclamo.estado,
-          estado_nuevo: 'En revisión',
+          estado_nuevo: estadoDestino,
         });
-        return res.json({ ok: true, mensaje: 'Reclamo reabierto exitosamente.' });
+        return res.json({ ok: true, mensaje: 'Reclamo reabierto exitosamente.', estado: estadoDestino });
       }
 
       res.status(400).json({ ok: false, mensaje: 'No se pudo reabrir el reclamo.' });
@@ -426,12 +434,32 @@ const { filtrosReclamo } = require('../services/claimFilterService');
       const { id } = req.params;
       const idUsuario = req.user.id;
 
+      // 1. Exclusivo de ciudadanos (HU-16)
+      if (req.user.role !== 'ciudadano') {
+        return res.status(403).json({ ok: false, mensaje: 'Esta funcionalidad es exclusiva para ciudadanos' });
+      }
+
       const reclamo = await ClaimModel.getById(id);
       if (!reclamo) return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
 
-      // No se puede afectar si el reclamo es privado y no es el autor (aunque no deberian llegar acá)
-      if (reclamo.visibilidad === 'privado' && Number(reclamo.id_usuario) !== Number(idUsuario)) {
-        return res.status(403).json({ ok: false, mensaje: 'No puedes interactuar con un reclamo privado ajeno' });
+      // 2. No disponible en reclamos privados
+      if (reclamo.visibilidad === 'privado') {
+        return res.status(403).json({ ok: false, mensaje: 'No se puede participar en reclamos privados' });
+      }
+
+      // 3. No disponible en estados terminales (Resuelto o Cancelado)
+      if (['Resuelto', 'Cancelado'].includes(reclamo.estado)) {
+        return res.status(400).json({ ok: false, mensaje: 'No se pueden registrar adhesiones en reclamos finalizados' });
+      }
+
+      // 4. El autor no puede adherirse a su propio reclamo
+      if (Number(reclamo.id_usuario) === Number(idUsuario)) {
+        return res.status(400).json({ ok: false, mensaje: 'No puedes adherirte a tu propio reclamo' });
+      }
+
+      // 5. Restricción territorial: sólo ciudadanos de la misma ciudad (no visitantes)
+      if (req.user.id_ciudad && reclamo.id_ciudad && Number(req.user.id_ciudad) !== Number(reclamo.id_ciudad)) {
+        return res.status(403).json({ ok: false, mensaje: 'Solo puedes participar en reclamos de tu ciudad' });
       }
 
       // Check if user already marked
