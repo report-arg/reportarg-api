@@ -5,7 +5,7 @@ const { seguimiento, compararAtencion } = require('../services/claimTrackingServ
 const ClaimModel = {
 
   /**
-   * Cuenta la cantidad de reclamos en estado 'Pendiente' creados por un ciudadano. (HU-01 CA 8: Máx 3 reclamos pendientes)
+   * Cuenta la cantidad de reclamos en estado 'Pendiente' creados por un ciudadano. (Limitado por BUSINESS_RULES.CLAIM_MAX_PENDING_PER_CITIZEN)
    * @param {number} idUsuario
    */
   async countPendientesByUsuario(idUsuario) {

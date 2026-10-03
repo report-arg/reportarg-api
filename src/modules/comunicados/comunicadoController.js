@@ -17,13 +17,12 @@ const comunicadoController = {
    * GET /api/comunicados/categorias
    * Devuelve categorías válidas para comunicados (tipo 'comunicado' o 'ambos').
    */
-  async categorias(req, res) {
+  async categorias(req, res, next) {
     try {
       const data = await CategoryModel.getParaComunicado();
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error categorías comunicado:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener categorías' });
+      next(err);
     }
   },
 
@@ -31,7 +30,7 @@ const comunicadoController = {
    * POST /api/comunicados
    * Crea un nuevo comunicado en la tabla `comunicados`.
    */
-  async crear(req, res) {
+  async crear(req, res, next) {
     try {
       const { titulo, descripcion, id_categoria, imagen = null } = req.body;
       const idInstitucion = await resolveInstitutionId(req);
@@ -67,8 +66,7 @@ const comunicadoController = {
 
       res.status(201).json({ ok: true, id });
     } catch (err) {
-      console.error('Error crear comunicado:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al crear el comunicado' });
+      next(err);
     }
   },
 
@@ -76,7 +74,7 @@ const comunicadoController = {
    * GET /api/comunicados/mis-comunicados
    * Devuelve los comunicados publicados por la institución autenticada.
    */
-  async misComunicados(req, res) {
+  async misComunicados(req, res, next) {
     try {
       const idInstitucion = await resolveInstitutionId(req);
       if (!idInstitucion) return res.json({ ok: true, data: [] });
@@ -84,12 +82,11 @@ const comunicadoController = {
       const data = await ComunicadoModel.getByInstitucion(idInstitucion);
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error mis comunicados:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener comunicados' });
+      next(err);
     }
   },
 
-  async eliminar(req, res) {
+  async eliminar(req, res, next) {
     try {
       const idInstitucion = await resolveInstitutionId(req);
       if (!idInstitucion) {
@@ -102,12 +99,11 @@ const comunicadoController = {
       }
       return res.json({ ok: true });
     } catch (err) {
-      console.error('Error eliminar comunicado:', err);
-      return res.status(500).json({ ok: false, mensaje: 'Error al eliminar comunicado' });
+      next(err);
     }
   },
 
-  async editar(req, res) {
+  async editar(req, res, next) {
     try {
       const { id } = req.params;
       const { titulo, descripcion, id_categoria, imagen } = req.body;
@@ -147,8 +143,7 @@ const comunicadoController = {
 
       return res.json({ ok: true, mensaje: 'Comunicado actualizado exitosamente' });
     } catch (err) {
-      console.error('Error editar comunicado:', err);
-      return res.status(500).json({ ok: false, mensaje: 'Error al actualizar el comunicado' });
+      next(err);
     }
   },
 };

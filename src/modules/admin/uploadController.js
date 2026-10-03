@@ -1,13 +1,12 @@
 const cloudinary = require('../../config/cloudinary');
 
 const uploadController = {
-  async subirFoto(req, res) {
+  async subirFoto(req, res, next) {
     try {
       if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-        return res.status(500).json({
-          ok: false,
-          mensaje: 'Falta configurar Cloudinary en el servidor (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET).',
-        });
+        const error = new Error('Falta configurar Cloudinary en el servidor (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET).');
+        error.status = 500;
+        throw error;
       }
 
       if (!req.file) {
@@ -28,8 +27,7 @@ const uploadController = {
 
       res.json({ ok: true, url: resultado.secure_url });
     } catch (err) {
-      console.error('Error subir foto:', err);
-      res.status(500).json({ ok: false, mensaje: err.message || 'Error al subir la imagen' });
+      next(err);
     }
   },
 };

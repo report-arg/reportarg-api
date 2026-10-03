@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { verifyToken, requireAdmin } = require('./middlewares/authMiddleware');
+const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 
 dotenv.config({ quiet: true });
 
@@ -67,9 +68,7 @@ app.use('/api/actividad', actividadRoutes);
 const institucionReclamoRoutes = require('./modules/reclamos/routes/institucionReclamoRoutes');
 app.use('/api/institucion/reclamos', institucionReclamoRoutes);
 
-app.use((err, req, res, next) => {
-  console.error('Error no manejado:', err.message);
-  res.status(err.status || 500).json({ ok: false, mensaje: err.message || 'Error interno del servidor' });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 module.exports = app;

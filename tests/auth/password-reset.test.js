@@ -115,7 +115,7 @@ describe('Recuperación de contraseña', () => {
         .send({ email: TEST_EMAIL });
 
       expect(res.status).toBe(500);
-      expect(res.body.error).toMatch(/servidor/i);
+      expect(res.body.mensaje).toMatch(/servidor/i);
       consoleSpy.mockRestore();
     });
   });

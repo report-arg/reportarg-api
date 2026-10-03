@@ -7,14 +7,13 @@ const comentarioController = {
    * Devuelve todos los comentarios de un reclamo/comunicado.
    * 
    */
-  async listar(req, res) {
+  async listar(req, res, next) {
     try {
       const { idReclamo } = req.params;
       const data = await ComentarioModel.getByReclamo(Number(idReclamo));
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error listar comentarios:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener comentarios' });
+      next(err);
     }
   },
 
@@ -23,7 +22,7 @@ const comentarioController = {
    * Crea un nuevo comentario.
    * Body: { id_reclamo, texto }
    */
-  async crear(req, res) {
+  async crear(req, res, next) {
     try {
       const { id_reclamo, texto } = req.body;
       const id_usuario = req.user.id;
@@ -45,12 +44,11 @@ const comentarioController = {
 
       res.status(201).json({ ok: true, id });
     } catch (err) {
-      console.error('Error crear comentario:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al guardar el comentario' });
+      next(err);
     }
   },
 
-  async eliminar(req, res) {
+  async eliminar(req, res, next) {
     try {
       const { id } = req.params;
       const afectados = await ComentarioModel.eliminar(Number(id), Number(req.user.id));
@@ -59,8 +57,7 @@ const comentarioController = {
 
       res.json({ ok: true });
     } catch (err) {
-      console.error('Error eliminar comentario:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al eliminar comentario' });
+      next(err);
     }
   },
 };

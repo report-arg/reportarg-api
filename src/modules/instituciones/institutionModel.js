@@ -2,6 +2,20 @@ const db = require('../../config/db');
 
 const InstitutionModel = {
 
+  async getByUserId(userId) {
+    const [institutions] = await db.query('SELECT id_institucion FROM instituciones WHERE id_usuario = ?', [userId]);
+    return institutions[0] || null;
+  },
+
+  async create(connection, { id_usuario, nombre, tipo, telefono, provincia, ciudad, zona, direccion, status, id_ciudad }) {
+    const executor = connection || db;
+    await executor.query(
+      `INSERT INTO instituciones (id_usuario, nombre, tipo, telefono, provincia, ciudad, zona, direccion, status, id_ciudad)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id_usuario, nombre, tipo, telefono, provincia, ciudad, zona, direccion, status, id_ciudad]
+    );
+  },
+
   async getAll({ estado } = {}) {
     let query = `
       SELECT

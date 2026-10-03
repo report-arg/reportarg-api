@@ -3,7 +3,7 @@ const CategoryModel = require('../categorias/categoryModel');
 
 const feedController = {
 
-  async getFeed(req, res) {
+  async getFeed(req, res, next) {
     try {
       const pagina    = parseInt(req.query.pagina)  || 1;
       const limite    = parseInt(req.query.limite)  || 10;
@@ -28,30 +28,27 @@ const feedController = {
           : undefined,
       });
     } catch (err) {
-      console.error('Error feed:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener el feed' });
+      next(err);
     }
   },
 
-  async getCategorias(req, res) {
+  async getCategorias(req, res, next) {
     try {
       const todas   = await CategoryModel.getAll();
       const activas = todas.filter(c => c.estado === 'activo');
       res.json({ ok: true, data: activas });
     } catch (err) {
-      console.error('Error categorías públicas:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener categorías' });
+      next(err);
     }
   },
 
-  async getTendencias(req, res) {
+  async getTendencias(req, res, next) {
     try {
       const idCiudad = req.user?.id_ciudad || null;
       const data     = await FeedModel.getTendencias(idCiudad);
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error tendencias:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener tendencias' });
+      next(err);
     }
   },
 };

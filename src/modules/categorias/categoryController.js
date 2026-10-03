@@ -2,28 +2,26 @@ const CategoryModel = require('./categoryModel');
 
 const categoryController = {
 
-  async listar(req, res) {
+  async listar(req, res, next) {
     try {
       const categorias = await CategoryModel.getAll();
       res.json({ ok: true, data: categorias });
     } catch (err) {
-      console.error('Error listar categorias:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener categorías' });
+      next(err);
     }
   },
 
-  async obtener(req, res) {
+  async obtener(req, res, next) {
     try {
       const categoria = await CategoryModel.getById(req.params.id);
       if (!categoria) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
       res.json({ ok: true, data: categoria });
     } catch (err) {
-      console.error('Error obtener categoria:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener categoría' });
+      next(err);
     }
   },
 
-  async crear(req, res) {
+  async crear(req, res, next) {
     try {
       const { nombre, descripcion, tipo, estado, orden } = req.body;
 
@@ -48,12 +46,11 @@ const categoryController = {
 
       res.status(201).json({ ok: true, mensaje: 'Categoría creada correctamente', id, codigo });
     } catch (err) {
-      console.error('Error crear categoria:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al crear categoría' });
+      next(err);
     }
   },
 
-  async editar(req, res) {
+  async editar(req, res, next) {
     try {
       const { nombre, descripcion, tipo, estado, orden } = req.body;
       const { id } = req.params;
@@ -83,12 +80,11 @@ const categoryController = {
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
       res.json({ ok: true, mensaje: 'Categoría actualizada correctamente' });
     } catch (err) {
-      console.error('Error editar categoria:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al editar categoría' });
+      next(err);
     }
   },
 
-  async bajaLogica(req, res) {
+  async bajaLogica(req, res, next) {
     try {
       const { id } = req.params;
       const categoria = await CategoryModel.getById(id);
@@ -100,12 +96,11 @@ const categoryController = {
       await CategoryModel.bajaLogica(id);
       res.json({ ok: true, mensaje: 'Categoría desactivada correctamente' });
     } catch (err) {
-      console.error('Error baja logica categoria:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al desactivar categoría' });
+      next(err);
     }
   },
 
-  async eliminar(req, res) {
+  async eliminar(req, res, next) {
     try {
       const filas = await CategoryModel.delete(req.params.id);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
@@ -114,8 +109,7 @@ const categoryController = {
       if (err.message.includes('reclamos asociados')) {
         return res.status(409).json({ ok: false, mensaje: err.message });
       }
-      console.error('Error eliminar categoria:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al eliminar categoría' });
+      next(err);
     }
   },
 

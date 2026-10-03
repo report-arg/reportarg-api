@@ -3,29 +3,27 @@ const db = require('../../../config/db');
 
 const userController = {
 
-  async listar(req, res) {
+  async listar(req, res, next) {
     try {
       const { busqueda, rol, estado } = req.query;
       const usuarios = await UserModel.getAll({ busqueda, rol, estado });
       res.json({ ok: true, data: usuarios });
     } catch (err) {
-      console.error('Error listar usuarios:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener usuarios' });
+      next(err);
     }
   },
 
-  async obtener(req, res) {
+  async obtener(req, res, next) {
     try {
       const usuario = await UserModel.getById(req.params.id);
       if (!usuario) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
       res.json({ ok: true, data: usuario });
     } catch (err) {
-      console.error('Error obtener usuario:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener usuario' });
+      next(err);
     }
   },
 
-  async crear(req, res) {
+  async crear(req, res, next) {
   try {
     const { email, password, rol, estado, nombre, foto } = req.body;
 
@@ -84,12 +82,11 @@ const userController = {
     res.status(201).json({ ok: true, mensaje: 'Usuario creado correctamente', id });
 
   } catch (err) {
-    console.error('Error crear usuario:', err);
-    res.status(500).json({ ok: false, mensaje: 'Error al crear usuario' });
+    next(err);
   }
 },
 
-  async editar(req, res) {
+  async editar(req, res, next) {
   try {
     const { email, rol, estado, foto } = req.body;
     const { id } = req.params;
@@ -116,11 +113,10 @@ const userController = {
 
     res.json({ ok: true, mensaje: 'Usuario actualizado correctamente' });
   } catch (err) {
-    console.error('Error editar usuario:', err);
-    res.status(500).json({ ok: false, mensaje: 'Error al editar usuario' });
+    next(err);
   }
 },
-  async cambiarRol(req, res) {
+  async cambiarRol(req, res, next) {
     try {
       const { rol } = req.body;
       const rolesValidos = ['admin', 'ciudadano', 'institucion'];
@@ -131,33 +127,30 @@ const userController = {
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
       res.json({ ok: true, mensaje: 'Rol actualizado correctamente' });
     } catch (err) {
-      console.error('Error cambiar rol:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al cambiar rol' });
+      next(err);
     }
   },
 
-  async eliminar(req, res) {
+  async eliminar(req, res, next) {
     try {
       const filas = await UserModel.delete(req.params.id);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
       res.json({ ok: true, mensaje: 'Usuario eliminado correctamente' });
     } catch (err) {
-      console.error('Error eliminar usuario:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al eliminar usuario' });
+      next(err);
     }
   },
 
-  async stats(req, res) {
+  async stats(req, res, next) {
     try {
       const data = await UserModel.getStats();
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error stats:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener estadísticas' });
+      next(err);
     }
   },
 
-  async actualizarPerfil(req, res) {
+  async actualizarPerfil(req, res, next) {
     try {
       const { nombre, apellido, email, provincia, ciudad, zona, foto } = req.body;
       const id = req.params.id || req.user.id;
@@ -170,12 +163,11 @@ const userController = {
       await UserModel.updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto });
       res.json({ ok: true, mensaje: 'Perfil actualizado correctamente' });
     } catch (err) {
-      console.error('Error actualizar perfil:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al actualizar el perfil' });
+      next(err);
     }
   },
 
-  async cambiarPassword(req, res) {
+  async cambiarPassword(req, res, next) {
     try {
       const { passwordActual, passwordNueva } = req.body;
       const id = req.params.id || req.user.id;
@@ -188,9 +180,10 @@ const userController = {
       await UserModel.cambiarPassword(id, passwordActual, passwordNueva);
       res.json({ ok: true, mensaje: 'Contraseña actualizada correctamente' });
     } catch (err) {
-      console.error('Error cambiar password:', err);
-      const status = err.message === 'La contraseña actual es incorrecta' ? 400 : 500;
-      res.status(status).json({ ok: false, mensaje: err.message });
+      if (err.message === 'La contraseña actual es incorrecta') {
+        err.status = 400;
+      }
+      next(err);
     }
   },
 };

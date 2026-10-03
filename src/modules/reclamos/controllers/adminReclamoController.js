@@ -4,47 +4,43 @@ const { CLAIM_STATUSES } = require('../../../constants/publication');
 
 const claimController = {
 
-  async stats(req, res) {
+  async stats(req, res, next) {
     try {
       const data = await ClaimModel.getStats();
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error stats reclamos:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener estadísticas' });
+      next(err);
     }
   },
 
-  async ultimos(req, res) {
+  async ultimos(req, res, next) {
     try {
       const data = await ClaimModel.getUltimos(5);
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error ultimos reclamos:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener últimos reclamos' });
+      next(err);
     }
   },
 
-  async actividadMensual(req, res) {
+  async actividadMensual(req, res, next) {
     try {
       const data = await ClaimModel.getActividadMensual();
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error actividad mensual:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener actividad mensual' });
+      next(err);
     }
   },
 
-  async porCategoria(req, res) {
+  async porCategoria(req, res, next) {
     try {
       const data = await ClaimModel.getPorCategoria();
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error reclamos por categoria:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener reclamos por categoría' });
+      next(err);
     }
   },
 
-  async lista(req, res) {
+  async lista(req, res, next) {
     try {
       const { estado, pagina = 1, limite = 20 } = req.query;
       if ((estado && !Object.values(CLAIM_STATUSES).includes(estado)) || !/^\d+$/.test(String(pagina)) || !/^\d+$/.test(String(limite)) || Number(pagina) < 1 || Number(limite) < 1 || Number(limite) > 100) return res.status(400).json({ ok: false, mensaje: 'Filtros o paginaci?n inválidos' });
@@ -60,20 +56,18 @@ const claimController = {
         totalPaginas: Math.ceil(result.total / parseInt(limite)),
       });
     } catch (err) {
-      console.error('Error lista reclamos:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener reclamos' });
+      next(err);
     }
   },
 
-  async detalle(req, res) {
+  async detalle(req, res, next) {
     try {
       const reclamo = await ClaimModel.getById(req.params.id);
       if (!reclamo) return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
       const historial = await HistorialModel.getByReclamo(req.params.id);
       res.json({ ok: true, data: { ...reclamo, historial } });
     } catch (err) {
-      console.error('Error detalle reclamo:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener reclamo' });
+      next(err);
     }
   },
 
@@ -81,7 +75,7 @@ const claimController = {
     return res.status(403).json({ ok: false, mensaje: 'La gestión de estados corresponde a la institución responsable' });
   },
 
-  async reasignarInstitucion(req, res) {
+  async reasignarInstitucion(req, res, next) {
     try {
       const { id } = req.params;
       const { id_institucion } = req.body;
@@ -98,10 +92,7 @@ const claimController = {
 
       res.json({ ok: true, mensaje: 'Reclamo reasignado exitosamente' });
     } catch (err) {
-      // Propagar el status de negocio (404, 400) que establece el modelo
-      const statusCode = (err.status && err.status >= 400 && err.status < 500) ? err.status : 500;
-      const mensaje = statusCode < 500 ? err.message : 'Error interno al reasignar institución';
-      res.status(statusCode).json({ ok: false, mensaje });
+      next(err);
     }
   }
 };

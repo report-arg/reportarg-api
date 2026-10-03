@@ -3,18 +3,17 @@ const emailService     = require('../../services/emailService');
 
 const institutionController = {
 
-  async listar(req, res) {
+  async listar(req, res, next) {
     try {
       const { estado } = req.query;
       const instituciones = await InstitutionModel.getAll({ estado });
       res.json({ ok: true, data: instituciones });
     } catch (err) {
-      console.error('Error listar instituciones:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener instituciones' });
+      next(err);
     }
   },
 
-  async obtener(req, res) {
+  async obtener(req, res, next) {
     try {
       const institucion = await InstitutionModel.getById(req.params.id);
       if (!institucion) {
@@ -22,12 +21,11 @@ const institutionController = {
       }
       res.json({ ok: true, data: institucion });
     } catch (err) {
-      console.error('Error obtener institucion:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener institución' });
+      next(err);
     }
   },
 
-  async verificar(req, res) {
+  async verificar(req, res, next) {
     try {
       const institucion = await InstitutionModel.getById(req.params.id);
       if (!institucion) {
@@ -48,12 +46,11 @@ const institutionController = {
 
       res.json({ ok: true, mensaje: 'Institución verificada correctamente' });
     } catch (err) {
-      console.error('Error verificar institucion:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al verificar institución' });
+      next(err);
     }
   },
 
-  async rechazar(req, res) {
+  async rechazar(req, res, next) {
     try {
       const { motivo } = req.body;
 
@@ -81,18 +78,16 @@ const institutionController = {
 
       res.json({ ok: true, mensaje: 'Institución rechazada correctamente' });
     } catch (err) {
-      console.error('Error rechazar institucion:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al rechazar institución' });
+      next(err);
     }
   },
 
-  async stats(req, res) {
+  async stats(req, res, next) {
     try {
       const data = await InstitutionModel.getStats();
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error stats instituciones:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener estadísticas' });
+      next(err);
     }
   },
 };

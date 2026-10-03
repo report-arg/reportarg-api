@@ -1,7 +1,7 @@
 const db = require('../../config/db');
 
 const actividadController = {
-  async getResumen(req, res) {
+  async getResumen(req, res, next) {
     try {
       const idCiudad = req.user?.id_ciudad || null;
       if (!idCiudad) {
@@ -55,8 +55,7 @@ const actividadController = {
         }
       });
     } catch (err) {
-      console.error('Error resumen actividad:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener el resumen de actividad' });
+      next(err);
     }
   }
 };

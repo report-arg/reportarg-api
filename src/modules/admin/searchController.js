@@ -2,7 +2,7 @@ const db = require('../../config/db');
 
 const searchController = {
 
-  async buscar(req, res) {
+  async buscar(req, res, next) {
     try {
       const { q } = req.query;
 
@@ -78,8 +78,7 @@ const searchController = {
       res.json({ ok: true, data: resultados });
 
     } catch (err) {
-      console.error('Error búsqueda global:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error en la búsqueda' });
+      next(err);
     }
   },
 };

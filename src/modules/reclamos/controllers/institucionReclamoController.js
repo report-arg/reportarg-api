@@ -6,19 +6,18 @@ const { CLAIM_STATUSES, HISTORIAL_EVENTS } = require('../../../constants/publica
 
 const institucionReclamoController = {
 
-  async bandeja(req, res) {
+  async bandeja(req, res, next) {
     try {
       const idInstitucion = req.user.id_institucion;
       const { estado, categoria, orderBy } = filtrosReclamo(req.query);
       const data = await ClaimModel.getBandejaInstitucion(idInstitucion, estado, categoria, orderBy, req.user.id_ciudad);
       res.json({ ok: true, data });
     } catch (err) {
-      console.error('Error al obtener bandeja institucional:', err);
-      res.status(err.status || 500).json({ ok: false, mensaje: err.status ? err.message : 'Error al obtener bandeja de reclamos' });
+      next(err);
     }
   },
 
-  async avanzarEstado(req, res) {
+  async avanzarEstado(req, res, next) {
     try {
       const { id } = req.params;
       const { nuevoEstado } = req.body;
@@ -69,12 +68,11 @@ const institucionReclamoController = {
 
       res.status(400).json({ ok: false, mensaje: 'No se pudo actualizar el estado' });
     } catch (err) {
-      console.error('Error avanzar estado:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al actualizar estado' });
+      next(err);
     }
   },
 
-  async resolver(req, res) {
+  async resolver(req, res, next) {
     try {
       const { id } = req.params;
       const { mensaje, evidenciaUrl } = req.body;
@@ -120,12 +118,11 @@ const institucionReclamoController = {
 
       res.status(400).json({ ok: false, mensaje: 'No se pudo resolver el reclamo' });
     } catch (err) {
-      console.error('Error resolver reclamo:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al resolver el reclamo' });
+      next(err);
     }
   },
 
-  async cancelar(req, res) {
+  async cancelar(req, res, next) {
     try {
       const { id } = req.params;
       const { motivo } = req.body;
@@ -172,8 +169,7 @@ const institucionReclamoController = {
 
       res.status(400).json({ ok: false, mensaje: 'No se pudo cancelar el reclamo' });
     } catch (err) {
-      console.error('Error cancelar reclamo:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al cancelar el reclamo' });
+      next(err);
     }
   }
 

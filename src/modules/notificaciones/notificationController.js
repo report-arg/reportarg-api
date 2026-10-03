@@ -4,7 +4,7 @@ const notificationController = {
   /**
    * Lista las notificaciones del usuario autenticado (derivado de req.user.id).
    */
-  async listar(req, res) {
+  async listar(req, res, next) {
     try {
       const idUsuario = req.user?.id;
       if (!idUsuario) {
@@ -46,15 +46,14 @@ const notificationController = {
         total: data.length,
       });
     } catch (err) {
-      console.error('Error al listar notificaciones:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al obtener notificaciones' });
+      next(err);
     }
   },
 
   /**
    * Obtiene la cantidad de notificaciones no leídas del usuario autenticado.
    */
-  async countNoLeidas(req, res) {
+  async countNoLeidas(req, res, next) {
     try {
       const idUsuario = req.user?.id;
       if (!idUsuario) {
@@ -64,8 +63,7 @@ const notificationController = {
       const count = await NotificationModel.countNoLeidas(idUsuario);
       res.json({ ok: true, noLeidas: count });
     } catch (err) {
-      console.error('Error al contar notificaciones no leídas:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al contar notificaciones' });
+      next(err);
     }
   },
 
@@ -73,7 +71,7 @@ const notificationController = {
    * Marca una notificación propia como leída.
    * Si no pertenece al usuario o no existe, retorna 404.
    */
-  async marcarLeida(req, res) {
+  async marcarLeida(req, res, next) {
     try {
       const idUsuario = req.user?.id;
       if (!idUsuario) {
@@ -92,15 +90,14 @@ const notificationController = {
 
       res.json({ ok: true, mensaje: 'Notificación marcada como leída' });
     } catch (err) {
-      console.error('Error al marcar notificación como leída:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al marcar notificación' });
+      next(err);
     }
   },
 
   /**
    * Marca todas las notificaciones pendientes del usuario autenticado como leídas.
    */
-  async marcarTodasLeidas(req, res) {
+  async marcarTodasLeidas(req, res, next) {
     try {
       const idUsuario = req.user?.id;
       if (!idUsuario) {
@@ -114,8 +111,7 @@ const notificationController = {
         actualizadas: affected,
       });
     } catch (err) {
-      console.error('Error al marcar todas las notificaciones:', err);
-      res.status(500).json({ ok: false, mensaje: 'Error al marcar notificaciones' });
+      next(err);
     }
   },
 };
