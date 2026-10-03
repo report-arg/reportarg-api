@@ -21,9 +21,11 @@
 
 Actualmente, las bases de datos de **Staging y Production se encuentran idénticas y sincronizadas**. 
 
-El **Baseline** de las bases de datos actuales está conformado por un historial de **Migraciones Válidas**. Los scripts de limpieza ad-hoc y datos de prueba fueron purgados de la carpeta `/migrations` a `/scripts/historical_cleanup/`.
+El **Baseline** de las bases de datos actuales está conformado por un historial de **Migraciones Válidas**. 
 
 **Importante:** Estas 7 migraciones representan el *baseline histórico reconocido de las bases actuales*. No se garantiza que, por sí solas y sin una inicialización previa de estructura, reconstruyan una base de datos vacía desde cero.
+
+Las numeraciones `005`, `007` y `010` correspondieron a scripts históricos de limpieza/prueba retirados del repositorio actual. Sus antecedentes permanecen disponibles en el historial de Git y estas numeraciones no deben reutilizarse. La próxima migración debe ser la `011`.
 
 Las **Migraciones Válidas** que componen el baseline histórico son:
 - `001_sprint4_schema_reclamos.sql` (Esquema y Backfill)
