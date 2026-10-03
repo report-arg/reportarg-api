@@ -1671,7 +1671,90 @@ migraciones necesarias.
 
 ---
 
-# 55. Registro de decisiones
+# 55. Arquitectura Técnica y Patrones
+
+El proyecto implementa una arquitectura en capas para separar responsabilidades de manera clara.
+
+## Backend
+
+El flujo recomendado de peticiones respeta la siguiente jerarquía:
+
+Routes
+↓
+Controllers
+↓
+Services
+↓
+Models
+↓
+MySQL
+
+*Nota: No todas las operaciones necesitan estrictamente todas las capas. Una consulta simple sin lógica de negocio puede ir de Controller a Model directamente.*
+
+### Controllers
+Responsabilidad HTTP exclusiva:
+- Recibir el `req` y `res`.
+- Extraer y validar `params`, `body`, `query`, y el usuario autenticado.
+- Llamar a la capa inferior (lógica de negocio o persistencia).
+- Formatear la respuesta de éxito (`res.json`).
+- Delegar cualquier error mediante `next(err)` al manejador central.
+
+### Services
+Capa de negocio y orquestación.
+
+Contiene las validaciones complejas, permisos detallados, orquestación de transacciones y coordinación entre múltiples dominios.
+Servicios importantes actuales:
+- `claimWorkflowService`: Transiciones de estado de reclamos.
+- `assignmentService`: Asignación a instituciones.
+- `claimFilterService`: Búsqueda y filtrado complejo de reclamos.
+- `claimTrackingService`: Registro de historial y notificaciones.
+- `notificationService`: Emisión de eventos.
+- `authService`: Orquestación del login, registro y tokens.
+
+### Models
+Capa de persistencia y ejecución de queries SQL.
+
+Contienen las consultas crudas a la base de datos MySQL mediante el pool o la conexión provista.
+Modelos relevantes actuales:
+- `userModel`, `ciudadanoModel`, `institutionModel`, `refreshTokenModel`.
+- `reclamoModel`, `historialModel`.
+
+### Transacciones SQL
+Las transacciones complejas que afectan múltiples entidades (ej. registro de usuarios y su perfil asociado) se gestionan coordinadamente:
+- El Service (`authService`) obtiene una conexión (`connection`) del pool.
+- El Service inicia la transacción (`connection.beginTransaction()`).
+- El Service inyecta la conexión a los distintos Models involucrados.
+- Los Models ejecutan las sentencias SQL utilizando esa conexión compartida.
+- El Service evalúa el resultado y ejecuta `commit()` o `rollback()`.
+- El Service NO contiene las consultas SQL (que pertenecen a los Models).
+
+### Manejo de Errores (Error Handler)
+- Todo Controller usa un bloque `try/catch` que atrapa errores inesperados y los delega invocando `next(err)`.
+- El middleware centralizado `errorHandler` los procesa.
+- Los errores funcionales esperados (ej. `400 Bad Request`, `404 Not Found`) mantienen su semántica y mensajes, asignados mediante `err.status`.
+- Los errores no controlados (ej. base de datos, excepciones de código) son sanitizados genéricamente como `500 Error Interno` hacia el frontend, y solo dejan un registro seguro (`console.error`) a nivel de servidor.
+
+### Reglas centralizadas
+Constantes y configuraciones clave de negocio se almacenan globalmente:
+- Límite de reclamos pendientes (ej. 3).
+- Límite de días para reapertura (ej. 15).
+Viven en `src/constants/businessRules.js`.
+
+---
+
+## Frontend
+
+La arquitectura se apoya en Next.js (App Router), con separación de roles sin unificar mecánicas contradictorias.
+
+- **Compartir piezas NO significa unificar experiencias:** Los componentes base (como `<ClaimTimeline />` para la vista de detalles del reclamo) se extraen y comparten para evitar código duplicado de UI, pero los Layouts y Páginas de Ciudadano (seguimiento, interacción) e Institución (gestión operativa) se mantienen en dominios estrictamente separados.
+- **Rutas por rol:** La navegación aísla contextos (`/ciudadano`, `/institucion`, `/admin`, `/auth`).
+- **Servicios:** Se centraliza el acceso API a través de `apiClient`, interceptando tokens automáticamente.
+- **Utils:** Centralización de colores y mapeos de estados, fechas, iconografía y validaciones Zod.
+- **Admin:** Aunque posee un panel visible, su desarrollo completo y consolidación general tiene funcionalidades pendientes.
+
+---
+
+# 56. Registro de decisiones
 
 | Fecha | Decisión | Motivo |
 |---|---|---|

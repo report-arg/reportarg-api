@@ -4,7 +4,7 @@ Este archivo se aplica a todo el repositorio. Antes de editar, revisá la solici
 
 ## Contexto y fuentes
 
-La API usa Express, CommonJS y MySQL mediante `mysql2`. El código está organizado por dominios en `src/modules/<dominio>/` (rutas → controladores → servicios de dominio → modelos). Para lógica e infraestructura transversal se utilizan `src/services/`, `src/middlewares/` y `src/config/`.
+La API usa Express, CommonJS y MySQL mediante `mysql2`. El código está organizado respetando la siguiente jerarquía de arquitectura en capas: **Routes → Controllers → Services (cuando corresponda) → Models → DB**. Para lógica e infraestructura transversal se utilizan `src/services/`, `src/middlewares/` y `src/config/`.
 
 Consultá según el cambio:
 
@@ -29,6 +29,8 @@ Consultá según el cambio:
 9. Conservá los contratos de respuesta existentes o actualizá de forma coordinada sus consumidores. No cambies nombres de campos, rutas o semántica de errores sin revisar frontend, pruebas y documentación.
 10. Validá entradas en el servidor y devolvé mensajes adecuados sin exponer credenciales, tokens, detalles SQL ni datos privados en respuestas o logs.
 11. **Consistencia de firmas:** Si modificás la firma de un método en los modelos de un módulo (por ejemplo, agregando un nuevo filtro o parámetro), es obligatorio que revises todos los controladores que lo invocan para asegurarte de que estén enviando los argumentos correctamente. Un parámetro olvidado en el controlador puede romper silenciosamente la consulta.
+12. **Uso de Constantes:** Evitá hardcodes de reglas de negocio. Usá las constantes y el módulo `businessRules` cuando corresponda. No dupliques reglas.
+13. **Manejo de Errores y DB:** Mantené el manejo centralizado de errores usando `next(err)`. No expongas errores internos al cliente. Evitá sentencias SQL directas en Controllers o Services, con la única excepción de coordinar el objeto `connection` para transacciones donde esté estrictamente justificado.
 
 ## Base de datos y pruebas
 
