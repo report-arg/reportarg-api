@@ -1,0 +1,118 @@
+const CategoryModel = require('./categoryModel');
+
+const categoryController = {
+
+  async listar(req, res, next) {
+    try {
+      const categorias = await CategoryModel.getAll();
+      res.json({ ok: true, data: categorias });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async obtener(req, res, next) {
+    try {
+      const categoria = await CategoryModel.getById(req.params.id);
+      if (!categoria) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
+      res.json({ ok: true, data: categoria });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async crear(req, res, next) {
+    try {
+      const { nombre, descripcion, tipo, estado, orden } = req.body;
+
+      // Validaciones obligatorias
+      if (!nombre?.trim()) return res.status(400).json({ ok: false, mensaje: 'El nombre es obligatorio' });
+      if (!tipo) return res.status(400).json({ ok: false, mensaje: 'El tipo es obligatorio' });
+      if (!['reclamo', 'comunicado', 'ambos'].includes(tipo)) {
+        return res.status(400).json({ ok: false, mensaje: 'Tipo inválido' });
+      }
+
+      // Validaciones de unicidad
+      const nombreExiste = await CategoryModel.nombreExiste(nombre.trim());
+      if (nombreExiste) return res.status(409).json({ ok: false, mensaje: 'Ya existe una categoría con ese nombre' });
+
+      const {id, codigo} = await CategoryModel.create({
+        nombre: nombre.trim(),
+        descripcion: descripcion?.trim() || null,
+        tipo,
+        estado: estado || 'activo',
+        orden: orden ?? 0,
+      });
+
+      res.status(201).json({ ok: true, mensaje: 'Categoría creada correctamente', id, codigo });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async editar(req, res, next) {
+    try {
+      const { nombre, descripcion, tipo, estado, orden } = req.body;
+      const { id } = req.params;
+
+      // Validaciones obligatorias
+      if (!nombre?.trim()) return res.status(400).json({ ok: false, mensaje: 'El nombre es obligatorio' });
+      if (!tipo) return res.status(400).json({ ok: false, mensaje: 'El tipo es obligatorio' });
+      if (!['reclamo', 'comunicado', 'ambos'].includes(tipo)) {
+        return res.status(400).json({ ok: false, mensaje: 'Tipo inválido' });
+      }
+      if (estado && !['activo', 'inactivo'].includes(estado)) {
+        return res.status(400).json({ ok: false, mensaje: 'Estado inválido' });
+      }
+
+      // Validación de unicidad de nombre
+      const nombreExiste = await CategoryModel.nombreExiste(nombre.trim(), id);
+      if (nombreExiste) return res.status(409).json({ ok: false, mensaje: 'Ya existe una categoría con ese nombre' });
+
+      const filas = await CategoryModel.update(id, {
+        nombre: nombre.trim(),
+        descripcion: descripcion?.trim() || null,
+        tipo,
+        estado: estado || 'activo',
+        orden: orden ?? 0,
+      });
+
+      if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
+      res.json({ ok: true, mensaje: 'Categoría actualizada correctamente' });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async bajaLogica(req, res, next) {
+    try {
+      const { id } = req.params;
+      const categoria = await CategoryModel.getById(id);
+      if (!categoria) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
+      if (categoria.estado === 'inactivo') {
+        return res.status(409).json({ ok: false, mensaje: 'La categoría ya está inactiva' });
+      }
+
+      await CategoryModel.bajaLogica(id);
+      res.json({ ok: true, mensaje: 'Categoría desactivada correctamente' });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async eliminar(req, res, next) {
+    try {
+      const filas = await CategoryModel.delete(req.params.id);
+      if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
+      res.json({ ok: true, mensaje: 'Categoría eliminada correctamente' });
+    } catch (err) {
+      if (err.message.includes('reclamos asociados')) {
+        return res.status(409).json({ ok: false, mensaje: err.message });
+      }
+      next(err);
+    }
+  },
+
+};
+
+module.exports = categoryController;

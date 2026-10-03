@@ -1,0 +1,8 @@
+const BUSINESS_RULES = Object.freeze({
+  CLAIM_MAX_PENDING_PER_CITIZEN: 3,
+  CLAIM_REOPEN_WINDOW_DAYS: 15
+});
+
+module.exports = {
+  BUSINESS_RULES
+};

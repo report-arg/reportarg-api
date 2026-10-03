@@ -9,6 +9,11 @@ jest.mock('../../src/config/db', () => ({
   })),
 }));
 
+jest.mock('../../src/services/emailService', () => ({
+  enviarCodigoVerificacion: jest.fn(),
+  enviarRecuperacionPassword: jest.fn(),
+}));
+
 jest.mock('../../src/config/emailService', () => ({
   enviarCodigoVerificacion: jest.fn(),
   enviarRecuperacionPassword: jest.fn(),
@@ -18,7 +23,7 @@ const jwt = require('jsonwebtoken');
 const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/config/db');
-const emailService = require('../../src/config/emailService');
+const emailService = require('../../src/services/emailService');
 
 const TEST_EMAIL = 'ciudadano@test.com';
 const resetSecret = () => process.env.JWT_RESET_SECRET || process.env.JWT_SECRET;
@@ -101,6 +106,7 @@ describe('Recuperación de contraseña', () => {
     });
 
     test('si falla el envío de mail → 500', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       db.query.mockResolvedValueOnce([[mockUser()]]);
       emailService.enviarRecuperacionPassword.mockRejectedValueOnce(new Error('SMTP down'));
 
@@ -109,7 +115,8 @@ describe('Recuperación de contraseña', () => {
         .send({ email: TEST_EMAIL });
 
       expect(res.status).toBe(500);
-      expect(res.body.error).toMatch(/servidor/i);
+      expect(res.body.mensaje).toMatch(/servidor/i);
+      consoleSpy.mockRestore();
     });
   });
 
