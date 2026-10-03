@@ -34,7 +34,13 @@ Consultá según el cambio:
 
 ## Base de datos y pruebas
 
-Los cambios de esquema van en un archivo SQL nuevo y secuencial bajo `migrations/`, siguiendo `migrations/REGLAS_MIGRACIONES.md`. No edites una migración ya aplicada para representar un cambio nuevo. Prepará y verificá el script, pero ejecutalo en Staging o Producción solo cuando la tarea incluya expresamente ese paso y el entorno esté identificado.
+Cualquier agente que modifique el esquema de la BD o inserte/modifique datos maestros **DEBE**:
+1. Revisar las migraciones existentes en `/migrations`.
+2. Crear un archivo SQL nuevo, secuencial y descriptivo (ej: `011_...`).
+3. **NUNCA** editar una migración que ya fue aplicada. Si algo necesita arreglo, se crea una nueva migración.
+4. **NUNCA** ejecutar la migración automáticamente en Producción.
+5. **NUNCA** incluir la sentencia `INSERT INTO schema_migrations` dentro del propio archivo `.sql`. El contenido de la migración y el mecanismo de registro deben estar estrictamente separados.
+6. Informar al usuario los pasos manuales necesarios para aplicar la migración en cada ambiente, recordando ejecutar primero el archivo `.sql` y, si es exitoso, ejecutar manualmente el `INSERT` en `schema_migrations`, siguiendo la guía en `migrations/REGLAS_MIGRACIONES.md`.
 
 Para cambios de comportamiento, agregá o ajustá pruebas significativas, especialmente de permisos, privacidad, ciudad y transiciones de reclamos. El comando disponible es:
 
