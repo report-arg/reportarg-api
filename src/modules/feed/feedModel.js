@@ -6,7 +6,7 @@ const FeedModel = {
    * Obtiene las publicaciones del feed combinando reclamos públicos y comunicados institucionales,
    * filtrados estrictamente por la ciudad activa y mapeados a un DTO común.
    */
-  async getFeed({ idCiudad = null, idCategoria = null, tipo = null, pagina = 1, limite = 10, idUsuarioActual = null } = {}) {
+  async getFeed({ idCiudad = null, idCategoria = null, tipo = null, estado = null, pagina = 1, limite = 10, idUsuarioActual = null } = {}) {
     if (!idCiudad) {
       return { items: [], total: 0 };
     }
@@ -36,6 +36,11 @@ const FeedModel = {
         reclamoParams.push(idCategoria);
       }
 
+      if (estado && estado !== 'Todos') {
+        reclamoWhere += ` AND r.estado = ?`;
+        reclamoParams.push(estado);
+      }
+
       queries.push(`
         SELECT
           r.id_reclamo                                    AS id,
@@ -58,11 +63,15 @@ const FeedModel = {
           0                                               AS cantidadComentarios,
           ${isAfectadoQuery}                              AS isAfectado,
           (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount,
-          (SELECT COUNT(*) FROM reclamos_actualizaciones rac WHERE rac.id_reclamo = r.id_reclamo) AS actualizacionesCount
+          (SELECT COUNT(*) FROM reclamos_actualizaciones rac WHERE rac.id_reclamo = r.id_reclamo) AS actualizacionesCount,
+          r.id_institucion                                AS id_institucion,
+          inst_rec.id_usuario                             AS id_usuario_institucion,
+          inst_rec.nombre                                 AS institucionNombre
         FROM reclamos r
-        LEFT JOIN categorias c  ON c.id_categoria = r.id_categoria
-        LEFT JOIN usuarios u    ON u.id_usuario   = r.id_usuario
-        LEFT JOIN ciudadanos ci ON ci.id_usuario  = r.id_usuario
+        LEFT JOIN categorias c          ON c.id_categoria = r.id_categoria
+        LEFT JOIN usuarios u            ON u.id_usuario   = r.id_usuario
+        LEFT JOIN ciudadanos ci         ON ci.id_usuario  = r.id_usuario
+        LEFT JOIN instituciones inst_rec ON inst_rec.id_institucion = r.id_institucion
         ${reclamoWhere}
       `);
       params.push(...reclamoParams);
@@ -99,7 +108,10 @@ const FeedModel = {
           0                                               AS cantidadComentarios,
           0                                               AS isAfectado,
           0                                               AS afectadosCount,
-          0                                               AS actualizacionesCount
+          0                                               AS actualizacionesCount,
+          com.id_institucion                              AS id_institucion,
+          inst.id_usuario                                 AS id_usuario_institucion,
+          inst.nombre                                     AS institucionNombre
         FROM comunicados com
 
         INNER JOIN instituciones inst ON inst.id_institucion = com.id_institucion

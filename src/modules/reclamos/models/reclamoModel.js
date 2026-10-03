@@ -49,7 +49,16 @@ const ClaimModel = {
   /**
    * Obtiene todos los reclamos propios del ciudadano autenticado (HU-06)
    */
-  async getByUsuario(idUsuario, { estado = null, categoria = null } = {}) {
+  async getByUsuario(idUsuario, { estado = null, categoria = null, orderBy = 'recientes' } = {}) {
+    let orderClause = 'ORDER BY r.fecha_creacion DESC';
+    if (orderBy === 'impacto') {
+      orderClause = 'ORDER BY afectadosCount DESC, r.fecha_creacion DESC';
+    } else if (orderBy === 'antiguos') {
+      orderClause = 'ORDER BY COALESCE(r.fecha_ultimo_cambio_estado, r.fecha_creacion) ASC, r.id_reclamo ASC';
+    } else if (orderBy === 'recientes') {
+      orderClause = 'ORDER BY COALESCE(r.fecha_ultimo_cambio_estado, r.fecha_creacion) DESC';
+    }
+
     const [rows] = await db.query(`
       SELECT
         r.id_reclamo     AS id,
@@ -75,9 +84,10 @@ const ClaimModel = {
       WHERE r.id_usuario = ?
         ${estado ? "AND r.estado = ?" : ""}
         ${categoria ? "AND r.id_categoria = ?" : ""}
-      ORDER BY r.fecha_creacion DESC
+      ${orderClause}
     `, [idUsuario, ...(estado ? [estado] : []), ...(categoria ? [categoria] : [])]);
-    return rows.map(r => seguimiento(r));
+    const data = rows.map(r => seguimiento(r));
+    return orderBy === 'atencion' ? data.sort(compararAtencion) : data;
   },
 
   /**

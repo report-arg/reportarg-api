@@ -16,11 +16,27 @@ const reclamoController = {
 
   /**
    * Obtiene las categorías habilitadas para crear reclamos
+   * Resolviendo la institución asignada automáticamente según la ciudad (HU-04, HU-05)
    */
   async categoriasParaReclamo(req, res) {
     try {
       const data = await CategoryModel.getParaReclamo();
-      res.json({ ok: true, data });
+      const id_ciudad = req.user?.id_ciudad || req.query.id_ciudad || 1;
+
+      const principal = await InstitutionModel.getPrincipalDeCiudad(id_ciudad);
+      const nombrePrincipal = principal?.nombre || null;
+
+      const categoriasConInstitucion = await Promise.all(
+        data.map(async (cat) => {
+          const direct = await InstitutionModel.getPorCategoriaYCiudad(cat.id, id_ciudad);
+          return {
+            ...cat,
+            institucion_responsable: direct?.nombre || nombrePrincipal
+          };
+        })
+      );
+
+      res.json({ ok: true, data: categoriasConInstitucion });
     } catch (err) {
       console.error('Error categorias para reclamo:', err);
       res.status(500).json({ ok: false, mensaje: 'Error al obtener categorías' });
@@ -232,6 +248,20 @@ const reclamoController = {
     } catch (err) {
       console.error('Error al obtener detalle del reclamo:', err);
       res.status(500).json({ ok: false, mensaje: 'Error al cargar el detalle del reclamo' });
+    }
+  },
+
+  /**
+   * Obtiene las actualizaciones públicas de un reclamo para su consulta en el feed
+   */
+  async obtenerActualizaciones(req, res) {
+    try {
+      const { id } = req.params;
+      const data = await ActualizacionModel.getByReclamo(id);
+      res.json({ ok: true, data });
+    } catch (err) {
+      console.error('Error al obtener actualizaciones:', err);
+      res.status(500).json({ ok: false, mensaje: 'Error al obtener actualizaciones' });
     }
   },
 

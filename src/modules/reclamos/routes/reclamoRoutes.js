@@ -1,11 +1,11 @@
 const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/reclamoController');
-const { verifyToken, requireRole, requireCiudadano } = require('../../../middlewares/authMiddleware');
+const { verifyToken, requireRole, requireCiudadano, optionalToken } = require('../../../middlewares/authMiddleware');
 const { ROLES } = require('../../../constants/roles');
 
-// Categorías para reclamo
-router.get('/categorias',   ctrl.categoriasParaReclamo);
+// Categorías para reclamo (con resolución de institución según ciudad)
+router.get('/categorias',   optionalToken, ctrl.categoriasParaReclamo);
 
 // Reclamos públicos de la ciudad
 router.get('/publicos',     verifyToken, ctrl.reclamosPublicos);
@@ -30,6 +30,9 @@ router.patch('/:id/cancelar', verifyToken, requireCiudadano, ctrl.cancelar);
 
 // Reabrir reclamo propio (Solo Resuelto/Cancelado)
 router.patch('/:id/reabrir', verifyToken, requireCiudadano, ctrl.reabrir);
+
+// Obtener actualizaciones del reclamo
+router.get('/:id/actualizaciones',  optionalToken, ctrl.obtenerActualizaciones);
 
 // Agregar actualización (Ciudadano o Institución)
 router.post('/:id/actualizaciones', verifyToken, ctrl.agregarActualizacion);

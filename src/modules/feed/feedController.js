@@ -9,12 +9,13 @@ const feedController = {
       const limite    = parseInt(req.query.limite)  || 10;
       const categoria = req.query.categoria         || null;
       const tipo      = req.query.tipo              || null; // 'reclamo' | 'comunicado'
+      const estado    = req.query.estado            || null;
 
       // Resolver ciudad activa estrictamente desde el contexto del usuario autenticado
       const idCiudad  = req.user?.id_ciudad || null;
       const idUsuarioActual = req.user?.id || null;
 
-      const { items, total } = await FeedModel.getFeed({ idCiudad, idCategoria: categoria, tipo, pagina, limite, idUsuarioActual });
+      const { items, total } = await FeedModel.getFeed({ idCiudad, idCategoria: categoria, tipo, estado, pagina, limite, idUsuarioActual });
 
       res.json({
         ok: true,
