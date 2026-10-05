@@ -13,6 +13,12 @@ o administración.
 Que una funcionalidad esté definida en este documento NO significa
 necesariamente que ya se encuentre implementada.
 
+Cuando una sección describa capacidades extensibles, solicitudes de
+activación, multi-ciudad, ciudad seleccionada, cambio de residencia,
+nuevas reglas institucionales o administración futura, debe quedar
+claro que representa un **comportamiento objetivo** o **decisión funcional**
+(evolución pendiente), y no necesariamente código existente.
+
 ### Documentación relacionada
 
 - `README.md`: introducción al repositorio, ambiente de desarrollo y comandos.
@@ -20,6 +26,28 @@ necesariamente que ya se encuentre implementada.
   transversales.
 - `docs/sprint4_reclamos.md`: especificación funcional y técnica detallada
   del módulo de Reclamos correspondiente al Sprint 4.
+
+---
+
+## Invariantes del dominio
+
+1. Viale es la primera ciudad activa, NO un valor hardcodeado del sistema.
+2. Residencia, ciudad operativa y ciudad seleccionada son conceptos diferentes.
+3. Una localidad puede existir aunque ReportARG todavía no opere allí.
+4. Un usuario sin ciudad operativa puede existir válidamente.
+5. La ciudad seleccionada nunca concede permisos de escritura.
+6. El backend deriva identidad, institución y autoridad territorial desde la autenticación; no confía en IDs enviados por el cliente.
+7. Registrarse como institución no significa estar verificada.
+8. Estar verificada no significa poseer todas las capacidades.
+9. Poseer GESTIONAR_RECLAMOS no significa gestionar todas las categorías.
+10. Solicitar una capacidad o categoría no significa tenerla autorizada.
+11. CIUDAD + CATEGORÍA posee una única institución responsable en el modelo actual.
+12. Cada ciudad activa posee una única institución principal.
+13. Ser institución principal no concede permisos administrativos.
+14. La revocación de permisos no modifica ni elimina el historial.
+15. Los reclamos conservan la ciudad y las relaciones históricas correspondientes al momento en que fueron creados.
+16. El modo visitante es un contexto de permisos y no debe asumirse como un cuarto tipo de cuenta.
+17. Las reglas de seguridad deben aplicarse en backend aunque la interfaz oculte una acción.
 
 ---
 
@@ -220,6 +248,30 @@ Si ReportARG todavía no está disponible en la localidad:
 Nunca debe asignarse automáticamente una ciudad activa diferente solamente
 para permitir utilizar la aplicación.
 
+### Solicitudes de Activación de Ciudades (Modelo Objetivo)
+
+La documentación establece que ciudadanos e instituciones cuya localidad no esté activa
+pueden solicitar su activación.
+
+**Solicitud Ciudadana:**
+Representa interés de ciudadanos de una localidad en que ReportARG esté disponible allí.
+Pueden acumularse solicitudes de distintos ciudadanos para ayudar a evaluar demanda.
+
+**Solicitud Institucional:**
+Tiene mayor relevancia administrativa, especialmente cuando la cuenta declara representar
+un municipio o institución pública. Sin embargo: QUE UNA CUENTA DECLARE REPRESENTAR UNA
+INSTITUCIÓN NO PRUEBA SU IDENTIDAD.
+
+Por lo tanto, una solicitud institucional puede recibir mayor prioridad para revisión,
+pero NUNCA debe:
+- activar automáticamente la ciudad;
+- verificar automáticamente la institución;
+- convertirla automáticamente en institución principal;
+- conceder capacidades o categorías.
+
+La activación debe continuar siendo una decisión explícita del Administrador.
+Las solicitudes sirven como información para esa decisión.
+
 ---
 
 # 8. Ciudad de residencia
@@ -305,6 +357,19 @@ Cambiar la ciudad seleccionada:
 
 La ciudad seleccionada es principalmente un contexto de navegación y
 consulta.
+
+## CIUDAD SELECCIONADA NO ES AUTORIDAD
+
+LA CIUDAD SELECCIONADA NUNCA CONCEDE AUTORIDAD PARA OPERACIONES PROTEGIDAS.
+
+Para acciones de escritura o participación:
+- el backend debe determinar la ciudad operativa desde la identidad autenticada y las reglas de negocio;
+- no debe confiar en `id_ciudad` enviado por body/query/header como fuente de autoridad;
+- nunca debe existir un fallback silencioso a Viale o `id_ciudad = 1`.
+
+Ejemplo: un ciudadano de Viale puede explorar Paraná. Pero un POST de reclamo NO puede
+utilizar Paraná simplemente porque el frontend la envió como ciudad seleccionada.
+Las restricciones deben aplicarse en backend, no únicamente ocultando botones.
 
 ---
 
@@ -617,8 +682,19 @@ La institución principal debe estar identificada claramente:
 Además, funciona como institución de respaldo para la asignación automática
 de reclamos cuando ninguna institución específica gestiona una categoría.
 
-Ser institución principal NO concede automáticamente permisos
-administrativos adicionales.
+No puede haber dos instituciones principales simultáneamente para la misma ciudad.
+La institución principal debe pertenecer a la misma ciudad y estar verificada.
+Debe mantener coherencia con la capacidad GESTIONAR_RECLAMOS si va a funcionar como
+fallback de asignación.
+
+La condición de institución principal:
+- NO concede permisos administrativos;
+- NO implica automáticamente delegación de administración;
+- NO reemplaza el sistema de capacidades;
+- NO autoriza automáticamente categorías específicas.
+
+La administración delegada a una institución principal es una evolución FUTURA
+y requerirá autorización explícita, revocable, limitada a su ciudad y auditada.
 
 ---
 
@@ -640,6 +716,31 @@ Una institución puede:
 - publicar comunicados sin gestionar reclamos;
 - gestionar reclamos;
 - tener ambas capacidades.
+
+**Capacidad Institucional != Categoría:**
+Hacer explícita esta separación. Una institución puede tener aprobada
+GESTIONAR_RECLAMOS, pero eso NO significa que pueda gestionar todas las categorías.
+Las categorías deben autorizarse por separado.
+PUBLICAR_COMUNICADOS es independiente y NO debe depender de las categorías.
+No reutilizar `institucion_categorias` como sistema general de permisos institucionales.
+
+**Modelo Extensible de Capacidades Institucionales (Objetivo):**
+Las capacidades institucionales deben modelarse de forma EXTENSIBLE.
+NO se debe diseñar el sistema agregando una nueva columna booleana a `instituciones` por cada capacidad
+(ej. puede_gestionar_reclamos, puede_publicar_eventos).
+El modelo objetivo debe contemplar:
+- catálogo de capacidades;
+- relación institución-capacidad.
+La relación debe permitir representar estados: SOLICITADA, APROBADA, RECHAZADA,
+y conservar información útil para auditoría (fechas, justificación, admin, etc).
+
+**Revocación de Capacidades y Categorías:**
+La revocación de una capacidad o categoría afecta operaciones futuras, pero NO
+debe modificar retroactivamente el historial.
+Si una institución pierde GESTIONAR_RECLAMOS, los reclamos históricos deben conservar
+qué institución los gestionó, sin borrar relaciones históricas.
+Si pierde PUBLICAR_COMUNICADOS, deja de poder realizar nuevas acciones, pero sus
+comunicados históricos NO desaparecen automáticamente.
 
 La navegación y las acciones disponibles deben respetar estas capacidades.
 

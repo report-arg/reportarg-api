@@ -16,6 +16,19 @@ Consultá según el cambio:
 - `src/constants/publication.js`: constantes de publicaciones, categorías, estados y eventos.
 - El frontend de ReportARG: consumidores de los contratos de la API.
 
+## Reglas territoriales e institucionales
+
+Antes de modificar registro, autenticación, ciudades, instituciones, permisos, reclamos, comunicados o navegación territorial, debes leer `docs/arquitectura_y_reglas.md`.
+
+Reglas breves:
+- No asumir que residencia, `usuarios.id_ciudad` y ciudad seleccionada son lo mismo.
+- Ciudad seleccionada no concede permisos.
+- No asumir que institución verificada posee todas las capacidades.
+- No asumir que una capacidad concede categorías.
+- No implementar autorización únicamente en frontend.
+- No hardcodear Viale, `id_ciudad = 1`, Municipalidad de Viale, ni IDs de categorías/instituciones.
+- Las reglas de permisos y territorialidad deben validarse en backend.
+
 ## Reglas de implementación
 
 1. Trabajá en la rama indicada y preservá cambios ajenos. No mezcles una modificación de dominio con una refactorización general innecesaria.
