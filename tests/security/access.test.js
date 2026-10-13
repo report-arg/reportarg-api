@@ -198,5 +198,54 @@ describe('Seguridad y control de acceso', () => {
       expect(res.body.ok).toBe(true);
     });
   });
+
+  describe('Protección contra auto-inhabilitación y auto-degradación de administradores', () => {
+    test('admin intentando eliminarse/inhabilitarse a sí mismo → 400', async () => {
+      const token = generateTestToken(ROLES.ADMIN, 3);
+      const res = await request(app)
+        .delete('/api/admin/usuarios/3')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.mensaje).toMatch(/no podés inhabilitar tu propia cuenta/i);
+    });
+
+    test('admin intentando cambiar su propio rol a ciudadano → 400', async () => {
+      const token = generateTestToken(ROLES.ADMIN, 3);
+      const res = await request(app)
+        .put('/api/admin/usuarios/3/rol')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ rol: 'ciudadano' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.mensaje).toMatch(/no podés cambiar el rol de tu propia cuenta/i);
+    });
+
+    test('admin intentando editarse a sí mismo poniendo estado inactivo → 400', async () => {
+      const token = generateTestToken(ROLES.ADMIN, 3);
+      const res = await request(app)
+        .put('/api/admin/usuarios/3')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ email: 'test@domain.com', estado: 'inactivo' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.mensaje).toMatch(/no podés inhabilitar tu propia cuenta/i);
+    });
+
+    test('admin intentando editarse a sí mismo cambiando rol a institucion → 400', async () => {
+      const token = generateTestToken(ROLES.ADMIN, 3);
+      const res = await request(app)
+        .put('/api/admin/usuarios/3')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ email: 'test@domain.com', rol: 'institucion' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.mensaje).toMatch(/no podés cambiar el rol de tu propia cuenta/i);
+    });
+  });
 });
 

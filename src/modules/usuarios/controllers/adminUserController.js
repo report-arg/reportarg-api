@@ -93,6 +93,15 @@ const userController = {
 
     if (!email) return res.status(400).json({ ok: false, mensaje: 'Email es obligatorio' });
 
+    if (Number(id) === Number(req.user?.id)) {
+      if (estado && estado !== 'activo') {
+        return res.status(400).json({ ok: false, mensaje: 'No podés inhabilitar tu propia cuenta administradora' });
+      }
+      if (rol && rol.toLowerCase() !== 'admin') {
+        return res.status(400).json({ ok: false, mensaje: 'No podés cambiar el rol de tu propia cuenta administradora' });
+      }
+    }
+
     const existe = await UserModel.emailExiste(email, id);
     if (existe) {
       return res.status(409).json({ ok: false, mensaje: 'El email ya está en uso' });
@@ -123,6 +132,9 @@ const userController = {
       if (!rolesValidos.includes(rol?.toLowerCase())) {
         return res.status(400).json({ ok: false, mensaje: 'Rol inválido' });
       }
+      if (Number(req.params.id) === Number(req.user?.id) && rol.toLowerCase() !== 'admin') {
+        return res.status(400).json({ ok: false, mensaje: 'No podés cambiar el rol de tu propia cuenta administradora' });
+      }
       const filas = await UserModel.updateRol(req.params.id, rol);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
       res.json({ ok: true, mensaje: 'Rol actualizado correctamente' });
@@ -133,6 +145,9 @@ const userController = {
 
   async eliminar(req, res, next) {
     try {
+      if (Number(req.params.id) === Number(req.user?.id)) {
+        return res.status(400).json({ ok: false, mensaje: 'No podés inhabilitar tu propia cuenta administradora' });
+      }
       const filas = await UserModel.delete(req.params.id);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
       res.json({ ok: true, mensaje: 'Usuario eliminado correctamente' });
