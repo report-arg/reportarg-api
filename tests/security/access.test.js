@@ -172,5 +172,31 @@ describe('Seguridad y control de acceso', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('GET /api/admin/ciudades', () => {
+    test('sin token → 401', async () => {
+      const res = await request(app).get('/api/admin/ciudades');
+      expect(res.status).toBe(401);
+    });
+
+    test('token de ciudadano → 403', async () => {
+      const token = generateTestToken(ROLES.CIUDADANO, 1);
+      const res = await request(app)
+        .get('/api/admin/ciudades')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+    });
+
+    test('token de administrador → 200', async () => {
+      const token = generateTestToken(ROLES.ADMIN, 3);
+      const res = await request(app)
+        .get('/api/admin/ciudades')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+    });
+  });
 });
 

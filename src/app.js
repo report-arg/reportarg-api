@@ -26,7 +26,7 @@ const {
 
 app.use('/api/auth', authRoutes);
 
-const { uploadRoutes, searchRoutes } = require('./modules/admin');
+const { uploadRoutes, searchRoutes, cityRoutes } = require('./modules/admin');
 
 app.use('/api/admin/usuarios/me', verifyToken, adminProfileRoutes);
 app.use('/api/admin/upload', verifyToken, uploadRoutes);
@@ -46,6 +46,8 @@ app.use('/api/admin/instituciones', institutionRoutes);
 
 const adminReclamoRoutes = require('./modules/reclamos/routes/adminReclamoRoutes');
 app.use('/api/admin/reclamos', adminReclamoRoutes);
+
+app.use('/api/admin/ciudades', cityRoutes);
 
 app.use('/api/admin/buscar', searchRoutes);
 
