@@ -3,4 +3,6 @@ module.exports = {
   searchRoutes: require('./searchRoutes'),
   uploadController: require('./uploadController'),
   uploadRoutes: require('./uploadRoutes'),
+  cityController: require('./cityController'),
+  cityRoutes: require('./cityRoutes'),
 };

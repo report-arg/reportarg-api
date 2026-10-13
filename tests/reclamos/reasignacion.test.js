@@ -92,7 +92,7 @@ describe('HU-21: Reasignación Administrativa de Reclamos', () => {
     const res = await request(app)
       .patch('/api/admin/reclamos/999/institucion')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ id_institucion: 5 });
+      .send({ id_institucion: 5, motivo: 'Reasignación de prueba' });
 
     expect(res.status).toBe(404);
     expect(res.body.mensaje).toMatch(/Reclamo no encontrado/i);
@@ -108,7 +108,7 @@ describe('HU-21: Reasignación Administrativa de Reclamos', () => {
     const res = await request(app)
       .patch('/api/admin/reclamos/1/institucion')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ id_institucion: 999 });
+      .send({ id_institucion: 999, motivo: 'Reasignación de prueba' });
 
     expect(res.status).toBe(404);
     expect(res.body.mensaje).toMatch(/destino no existe/i);
@@ -122,7 +122,7 @@ describe('HU-21: Reasignación Administrativa de Reclamos', () => {
     const res = await request(app)
       .patch('/api/admin/reclamos/1/institucion')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ id_institucion: 5 });
+      .send({ id_institucion: 5, motivo: 'Reasignación de prueba' });
 
     expect(res.status).toBe(400);
     expect(res.body.mensaje).toMatch(/misma ciudad/i);
@@ -136,7 +136,7 @@ describe('HU-21: Reasignación Administrativa de Reclamos', () => {
     const res = await request(app)
       .patch('/api/admin/reclamos/1/institucion')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ id_institucion: 5 });
+      .send({ id_institucion: 5, motivo: 'Reasignación de prueba' });
 
     expect(res.status).toBe(400);
     expect(res.body.mensaje).toMatch(/ya está asignado/i);

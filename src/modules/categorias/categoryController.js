@@ -4,7 +4,8 @@ const categoryController = {
 
   async listar(req, res, next) {
     try {
-      const categorias = await CategoryModel.getAll();
+      const { busqueda, tipo, estado } = req.query;
+      const categorias = await CategoryModel.getAll({ busqueda, tipo, estado });
       res.json({ ok: true, data: categorias });
     } catch (err) {
       next(err);
@@ -100,13 +101,34 @@ const categoryController = {
     }
   },
 
+  async reactivar(req, res, next) {
+    try {
+      const { id } = req.params;
+      const categoria = await CategoryModel.getById(id);
+      if (!categoria) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
+      if (categoria.estado === 'activo') {
+        return res.status(409).json({ ok: false, mensaje: 'La categoría ya está activa' });
+      }
+
+      await CategoryModel.reactivar(id);
+      res.json({ ok: true, mensaje: 'Categoría activada correctamente' });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async eliminar(req, res, next) {
     try {
-      const filas = await CategoryModel.delete(req.params.id);
-      if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
+      const categoria = await CategoryModel.getById(req.params.id);
+      if (!categoria) return res.status(404).json({ ok: false, mensaje: 'Categoría no encontrada' });
+
+      await CategoryModel.delete(req.params.id);
       res.json({ ok: true, mensaje: 'Categoría eliminada correctamente' });
     } catch (err) {
-      if (err.message.includes('reclamos asociados')) {
+      if (err.status) {
+        return res.status(err.status).json({ ok: false, mensaje: err.message });
+      }
+      if (err.message && err.message.includes('No se puede eliminar')) {
         return res.status(409).json({ ok: false, mensaje: err.message });
       }
       next(err);

@@ -5,9 +5,16 @@ const userController = {
 
   async listar(req, res, next) {
     try {
-      const { busqueda, rol, estado } = req.query;
-      const usuarios = await UserModel.getAll({ busqueda, rol, estado });
-      res.json({ ok: true, data: usuarios });
+      const { busqueda, rol, estado, pagina = 1, limite = 20 } = req.query;
+      const result = await UserModel.getAll({ busqueda, rol, estado, pagina, limite });
+      res.json({
+        ok: true,
+        data: result.rows,
+        total: result.total,
+        pagina: result.pagina,
+        limite: result.limite,
+        totalPaginas: result.totalPaginas,
+      });
     } catch (err) {
       next(err);
     }
@@ -24,108 +31,260 @@ const userController = {
   },
 
   async crear(req, res, next) {
-  try {
-    const { email, password, rol, estado, nombre, foto } = req.body;
-
-    // Validaciones
-    if (!email || !password) {
-      return res.status(400).json({ ok: false, mensaje: 'Email y contraseña son obligatorios' });
-    }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      return res.status(400).json({ ok: false, mensaje: 'Email inválido' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ ok: false, mensaje: 'La contraseña debe tener al menos 6 caracteres' });
-    }
-
-    // Verificar email duplicado
-    const existe = await UserModel.emailExiste(email);
-    if (existe) {
-      return res.status(409).json({ ok: false, mensaje: 'El email ya está registrado' });
-    }
-
-    // Crear usuario
-    const id = await UserModel.create({
-      email,
-      password,
-      rol: rol || 'ciudadano',
-      estado: estado || 'activo',
-    });
-
-    // Si es institución crear registro en tabla instituciones
-    if (rol === 'institucion') {
-      await db.query(`
-        INSERT INTO instituciones (id_usuario, nombre, foto_perfil, verificada)
-        VALUES (?, ?, ?, 0)
-      `, [id, nombre || email, foto || null]);
-    }
-
-    // Si es ciudadano crear registro en tabla ciudadanos
-    if (rol === 'ciudadano') {
-      const partes = (nombre || "").split(" ");
-      const nombreCiudadano   = partes[0] || "";
-      const apellidoCiudadano = partes.slice(1).join(" ") || "";
-      await db.query(`
-        INSERT INTO ciudadanos (id_usuario, nombre, apellido, foto_perfil)
-        VALUES (?, ?, ?, ?)
-      `, [id, nombreCiudadano, apellidoCiudadano, foto || null]);
-    }
-
-    // Enviar email de bienvenida
     try {
-      const emailService = require('../../../services/emailService');
-      await emailService.enviarBienvenida(email, nombre || email);
-    } catch (emailErr) {
-      console.error('Error enviando email de bienvenida:', emailErr.message);
+      const { email, password, rol, estado, nombre, foto } = req.body;
+
+      // Validaciones básicas
+      if (!email || !password) {
+        return res.status(400).json({ ok: false, mensaje: 'Email y contraseña son obligatorios' });
+      }
+      if (!/\S+@\S+\.\S+/.test(email)) {
+        return res.status(400).json({ ok: false, mensaje: 'Email inválido' });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ ok: false, mensaje: 'La contraseña debe tener al menos 6 caracteres' });
+      }
+
+      const rolesValidos = ['admin', 'ciudadano', 'institucion'];
+      const rolNormalizado = (rol || 'ciudadano').toLowerCase();
+      if (!rolesValidos.includes(rolNormalizado)) {
+        return res.status(400).json({ ok: false, mensaje: 'Rol inválido. Roles permitidos: admin, ciudadano' });
+      }
+
+      // Restricción: el alta de instituciones debe realizarse por el flujo institucional formal
+      // para asegurar la asignación territorial (ciudad/provincia), tipo de entidad y datos de contacto requeridos.
+      if (rolNormalizado === 'institucion') {
+        return res.status(400).json({
+          ok: false,
+          mensaje: 'El alta de cuentas institucionales debe realizarse a través del registro institucional (/register/institution) para garantizar su asignación territorial, tipo de entidad y datos de contacto requeridos.',
+        });
+      }
+
+      // Verificar email duplicado
+      const existe = await UserModel.emailExiste(email);
+      if (existe) {
+        return res.status(409).json({ ok: false, mensaje: 'El email ya está registrado' });
+      }
+
+      // Crear usuario en tabla usuarios
+      const id = await UserModel.create({
+        email,
+        password,
+        rol: rolNormalizado,
+        estado: estado || 'activo',
+      });
+
+      // Si es ciudadano o admin crear registro en tabla ciudadanos para preservar nombre y foto
+      if (rolNormalizado === 'ciudadano' || rolNormalizado === 'admin') {
+        const partes = (nombre || "").trim().split(" ");
+        const nombreCiudadano   = partes[0] || (rolNormalizado === 'admin' ? "Administrador" : "");
+        const apellidoCiudadano = partes.slice(1).join(" ") || "";
+        await db.query(`
+          INSERT INTO ciudadanos (id_usuario, nombre, apellido, foto_perfil)
+          VALUES (?, ?, ?, ?)
+        `, [id, nombreCiudadano, apellidoCiudadano, foto || null]);
+      }
+
+      // Enviar email de bienvenida si está disponible el servicio
+      try {
+        const emailService = require('../../../services/emailService');
+        await emailService.enviarBienvenida(email, nombre || email);
+      } catch (emailErr) {
+        console.error('Error enviando email de bienvenida:', emailErr.message);
+      }
+
+      res.status(201).json({ ok: true, mensaje: 'Usuario creado correctamente', id });
+
+    } catch (err) {
+      next(err);
     }
-
-    res.status(201).json({ ok: true, mensaje: 'Usuario creado correctamente', id });
-
-  } catch (err) {
-    next(err);
-  }
-},
+  },
 
   async editar(req, res, next) {
-  try {
-    const { email, rol, estado, foto } = req.body;
-    const { id } = req.params;
+    try {
+      const { email, rol, estado, foto, nombre } = req.body;
+      const { id } = req.params;
 
-    if (!email) return res.status(400).json({ ok: false, mensaje: 'Email es obligatorio' });
+      if (!email) return res.status(400).json({ ok: false, mensaje: 'Email es obligatorio' });
+      if (!/\S+@\S+\.\S+/.test(email)) return res.status(400).json({ ok: false, mensaje: 'Email inválido' });
 
-    const existe = await UserModel.emailExiste(email, id);
-    if (existe) {
-      return res.status(409).json({ ok: false, mensaje: 'El email ya está en uso' });
+      const usuarioActual = await UserModel.getById(id);
+      if (!usuarioActual) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+
+      // Protección: no auto-inhabilitación ni auto-degradación
+      if (Number(id) === Number(req.user?.id)) {
+        if (estado && estado !== 'activo') {
+          return res.status(400).json({ ok: false, mensaje: 'No podés inhabilitar tu propia cuenta administradora' });
+        }
+        if (rol && rol.toLowerCase() !== 'admin') {
+          return res.status(400).json({ ok: false, mensaje: 'No podés cambiar el rol de tu propia cuenta administradora' });
+        }
+      }
+
+      // Restricción de cambio de rol para preservar integridad
+      const rolActual = (usuarioActual.rol || '').toLowerCase();
+      const nuevoRol = rol ? rol.toLowerCase() : rolActual;
+
+      if (rol && nuevoRol !== rolActual) {
+        if (rolActual === 'institucion' && nuevoRol !== 'institucion') {
+          return res.status(400).json({
+            ok: false,
+            mensaje: 'No se puede cambiar el rol de una cuenta institucional para preservar la trazabilidad de los reclamos asignados. La gestión institucional debe realizarse desde el módulo correspondiente.'
+          });
+        }
+        if (rolActual !== 'institucion' && nuevoRol === 'institucion') {
+          return res.status(400).json({
+            ok: false,
+            mensaje: 'No se puede transformar una cuenta directamente a institución. El alta institucional requiere verificación formal de entidad y asignación territorial.'
+          });
+        }
+      }
+
+      const existe = await UserModel.emailExiste(email, id);
+      if (existe) {
+        return res.status(409).json({ ok: false, mensaje: 'El email ya está en uso' });
+      }
+
+      const filas = await UserModel.update(id, { email, rol: nuevoRol, estado: estado || usuarioActual.estado });
+      if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+
+      // Si se inhabilitó la cuenta, revocar refresh tokens activos
+      if (estado === 'inactivo') {
+        try {
+          const RefreshTokenModel = require('../models/refreshTokenModel');
+          await RefreshTokenModel.deleteByUserId(id);
+        } catch (_) {}
+      }
+
+      // Actualizar nombre y/o foto según el rol
+      if (nombre !== undefined || foto) {
+        if (nuevoRol === 'institucion') {
+          const updates = [];
+          const params = [];
+          if (nombre) { updates.push('nombre = ?'); params.push(nombre); }
+          if (foto) { updates.push('foto_perfil = ?'); params.push(foto); }
+          if (updates.length > 0) {
+            params.push(id);
+            await db.query(`UPDATE instituciones SET ${updates.join(', ')} WHERE id_usuario = ?`, params);
+          }
+        } else {
+          // Ciudadano o Admin
+          const partes = (nombre || usuarioActual.nombre || "").trim().split(" ");
+          const nombreCiudadano = partes[0] || "";
+          const apellidoCiudadano = partes.slice(1).join(" ") || "";
+          await db.query(`
+            INSERT INTO ciudadanos (id_usuario, nombre, apellido, foto_perfil)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+              nombre = VALUES(nombre),
+              apellido = VALUES(apellido),
+              foto_perfil = COALESCE(VALUES(foto_perfil), foto_perfil)
+          `, [id, nombreCiudadano, apellidoCiudadano, foto || null]);
+        }
+      }
+
+      res.json({ ok: true, mensaje: 'Usuario actualizado correctamente' });
+    } catch (err) {
+      next(err);
     }
+  },
 
-    const filas = await UserModel.update(id, { email, rol, estado });
-    if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
-
-    // Actualizar foto si se subió una nueva
-    if (foto) {
-      await db.query(`
-        UPDATE ciudadanos SET foto_perfil = ? WHERE id_usuario = ?
-      `, [foto, id]);
-      await db.query(`
-        UPDATE instituciones SET foto_perfil = ? WHERE id_usuario = ?
-      `, [foto, id]);
-    }
-
-    res.json({ ok: true, mensaje: 'Usuario actualizado correctamente' });
-  } catch (err) {
-    next(err);
-  }
-},
   async cambiarRol(req, res, next) {
     try {
+      const { id } = req.params;
       const { rol } = req.body;
       const rolesValidos = ['admin', 'ciudadano', 'institucion'];
-      if (!rolesValidos.includes(rol?.toLowerCase())) {
-        return res.status(400).json({ ok: false, mensaje: 'Rol inválido' });
+      if (!rol || !rolesValidos.includes(rol.toLowerCase())) {
+        return res.status(400).json({ ok: false, mensaje: 'Rol inválido. Roles válidos: admin, ciudadano, institucion' });
       }
-      const filas = await UserModel.updateRol(req.params.id, rol);
+
+      const nuevoRol = rol.toLowerCase();
+
+      // Protección: no auto-degradación
+      if (Number(id) === Number(req.user?.id) && nuevoRol !== 'admin') {
+        return res.status(400).json({ ok: false, mensaje: 'No podés cambiar el rol de tu propia cuenta administradora' });
+      }
+
+      const usuario = await UserModel.getById(id);
+      if (!usuario) {
+        return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+      }
+
+      const rolActual = (usuario.rol || '').toLowerCase();
+
+      if (rolActual === nuevoRol) {
+        return res.json({ ok: true, mensaje: 'El usuario ya posee el rol indicado' });
+      }
+
+      // Reglas de integridad
+      if (rolActual === 'institucion' && nuevoRol !== 'institucion') {
+        return res.status(400).json({
+          ok: false,
+          mensaje: 'No se puede cambiar el rol de una cuenta institucional para preservar la trazabilidad de los reclamos asignados. La gestión institucional debe realizarse desde el módulo correspondiente.'
+        });
+      }
+
+      if (rolActual !== 'institucion' && nuevoRol === 'institucion') {
+        return res.status(400).json({
+          ok: false,
+          mensaje: 'No se puede transformar una cuenta directamente a institución. El alta institucional requiere verificación formal de entidad y asignación territorial.'
+        });
+      }
+
+      const filas = await UserModel.updateRol(id, nuevoRol);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
-      res.json({ ok: true, mensaje: 'Rol actualizado correctamente' });
+
+      res.json({ ok: true, mensaje: `Rol actualizado correctamente a ${nuevoRol}` });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // Endpoint atómico para inhabilitar / rehabilitar cuentas de usuario
+  async cambiarEstado(req, res, next) {
+    try {
+      const { id } = req.params;
+      let { estado, activo } = req.body;
+
+      if (activo !== undefined && estado === undefined) {
+        estado = (activo === true || activo === 1 || activo === '1') ? 'activo' : 'inactivo';
+      }
+
+      if (!estado || !['activo', 'inactivo'].includes(String(estado).toLowerCase())) {
+        return res.status(400).json({ ok: false, mensaje: "Estado inválido. Valores aceptados: 'activo' o 'inactivo'" });
+      }
+
+      const nuevoEstado = String(estado).toLowerCase();
+      const esInactivo = nuevoEstado === 'inactivo';
+
+      // Protección: no auto-inhabilitación
+      if (Number(id) === Number(req.user?.id) && esInactivo) {
+        return res.status(400).json({ ok: false, mensaje: 'No podés inhabilitar tu propia cuenta administradora' });
+      }
+
+      const usuarioExistente = await UserModel.getById(id);
+      if (!usuarioExistente) {
+        return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+      }
+
+      const filas = await UserModel.setEstado(id, !esInactivo);
+      if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+
+      // Si se inhabilita, revocar refresh tokens
+      if (esInactivo) {
+        try {
+          const RefreshTokenModel = require('../models/refreshTokenModel');
+          await RefreshTokenModel.deleteByUserId(id);
+        } catch (tokenErr) {
+          console.error('Error al revocar refresh tokens al inhabilitar usuario:', tokenErr);
+        }
+      }
+
+      res.json({
+        ok: true,
+        mensaje: esInactivo ? 'Usuario inhabilitado correctamente' : 'Usuario rehabilitado correctamente',
+        data: { id: Number(id), estado: nuevoEstado, activo: esInactivo ? 0 : 1 },
+      });
     } catch (err) {
       next(err);
     }
@@ -133,9 +292,18 @@ const userController = {
 
   async eliminar(req, res, next) {
     try {
+      if (Number(req.params.id) === Number(req.user?.id)) {
+        return res.status(400).json({ ok: false, mensaje: 'No podés inhabilitar tu propia cuenta administradora' });
+      }
       const filas = await UserModel.delete(req.params.id);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
-      res.json({ ok: true, mensaje: 'Usuario eliminado correctamente' });
+
+      try {
+        const RefreshTokenModel = require('../models/refreshTokenModel');
+        await RefreshTokenModel.deleteByUserId(req.params.id);
+      } catch (_) {}
+
+      res.json({ ok: true, mensaje: 'Usuario inhabilitado correctamente' });
     } catch (err) {
       next(err);
     }
