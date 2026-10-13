@@ -32,22 +32,18 @@ const getUserFromToken = async (req) => {
       return null;
     }
 
-    let effectiveRole = normalizedDbRole;
-
-    // Si el rol en BD es institución pero la cuenta institucional no está verificada (verificada = 0),
-    // revocar los privilegios institucionales operativos asignando rol ciudadano
-    if (normalizedDbRole === ROLES.INSTITUCION) {
-      if (userDb.institucion_verificada !== undefined && userDb.institucion_verificada !== null && Number(userDb.institucion_verificada) === 0) {
-        effectiveRole = ROLES.CIUDADANO;
-      }
-    }
+    // Determinamos si la institución está formalmente verificada sin alterar el rol ni la identidad de la cuenta
+    const isInstitucionVerificada = userDb.institucion_verificada !== undefined && userDb.institucion_verificada !== null
+      ? Number(userDb.institucion_verificada) === 1
+      : false;
 
     return {
       id: userDb.id_usuario,
       email: userDb.email,
-      role: effectiveRole,
+      role: normalizedDbRole, // Conserva la identidad real en BD ('admin', 'institucion', 'ciudadano')
       id_ciudad: userDb.id_ciudad || null,
       id_institucion: userDb.id_institucion || null,
+      institucion_verificada: isInstitucionVerificada,
     };
   } catch (error) {
     return null;
@@ -80,7 +76,11 @@ const requireRole = (...allowedRoles) => {
     }
 
     if (!allowed.includes(req.user.role)) {
-      return res.status(403).json({ error: 'No tenés permisos para realizar esta acción.' });
+      return res.status(403).json({
+        error: 'No tenés permisos para realizar esta acción.',
+        codigo: 'ROL_NO_AUTORIZADO',
+        rolActual: req.user.role,
+      });
     }
 
     next();
@@ -89,7 +89,34 @@ const requireRole = (...allowedRoles) => {
 
 const requireAdmin = requireRole(ROLES.ADMIN);
 const requireCiudadano = requireRole(ROLES.CIUDADANO);
-const requireInstitucion = requireRole(ROLES.INSTITUCION);
+
+/**
+ * Middleware para capacidades institucionales operativas.
+ * Requiere identidad institucional Y estado verificado (aprobado formalmente).
+ * No permite que instituciones no verificadas o pendientes operen reclamos o comunicados.
+ */
+const requireInstitucion = (req, res, next) => {
+  if (!req.user?.id) {
+    return res.status(401).json({ error: 'Acceso denegado. No se proporcionó un token.' });
+  }
+
+  if (req.user.role !== ROLES.INSTITUCION) {
+    return res.status(403).json({
+      error: 'No tenés permisos para realizar esta acción.',
+      codigo: 'ROL_NO_AUTORIZADO',
+      rolActual: req.user.role,
+    });
+  }
+
+  if (!req.user.institucion_verificada) {
+    return res.status(403).json({
+      error: 'Institución pendiente de verificación o inhabilitada. Las capacidades operativas institucionales requieren aprobación previa.',
+      codigo: 'INSTITUCION_NO_VERIFICADA',
+    });
+  }
+
+  next();
+};
 
 module.exports = {
   getUserFromToken,

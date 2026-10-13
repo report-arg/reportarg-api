@@ -68,6 +68,8 @@ describe('Etapa 1: Seguridad e Integridad de Datos (ADMIN-01)', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error).toMatch(/no tenés permisos/i);
+      expect(res.body.codigo).toBe('ROL_NO_AUTORIZADO');
+      expect(res.body.rolActual).toBe('ciudadano');
     });
 
     test('Un usuario con rol en base de datos inexistente o inválido no hace fallback al token y es rechazado (401)', async () => {
@@ -146,7 +148,7 @@ describe('Etapa 1: Seguridad e Integridad de Datos (ADMIN-01)', () => {
   });
 
   describe('3. Permisos institucionales según el estado actual de la cuenta', () => {
-    test('Institución pendiente o no verificada (verificada = 0) pierde acceso institucional operativo (403)', async () => {
+    test('Institución pendiente o no verificada (verificada = 0) no puede realizar operaciones institucionales operativas (403)', async () => {
       const token = generateTestToken(ROLES.INSTITUCION, 201);
 
       db.query = jest.fn().mockImplementation(async (sql, params) => {
@@ -170,9 +172,39 @@ describe('Etapa 1: Seguridad e Integridad de Datos (ADMIN-01)', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ titulo: 'Aviso urgente' });
 
-      // Debe ser degradado a ciudadano operativo y recibir 403 Forbidden
       expect(res.status).toBe(403);
-      expect(res.body.error).toMatch(/no tenés permisos/i);
+      expect(res.body.codigo).toBe('INSTITUCION_NO_VERIFICADA');
+      expect(res.body.error).toMatch(/pendiente de verificación/i);
+    });
+
+    test('Institución no verificada conserva su rol institucion y NO puede acceder a operaciones ciudadanas (403)', async () => {
+      const token = generateTestToken(ROLES.INSTITUCION, 201);
+
+      db.query = jest.fn().mockImplementation(async (sql, params) => {
+        if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+          return [[{
+            id_usuario: 201,
+            email: 'inst_pendiente@test.com',
+            activo: 1,
+            tipo_usuario: 'institucion',
+            id_ciudad: 1,
+            id_institucion: 50,
+            institucion_verificada: 0, // No verificada
+          }]];
+        }
+        return [[]];
+      });
+
+      // Intenta acceder a una ruta exclusiva para ciudadanos (crear reclamo ciudadano)
+      const res = await request(app)
+        .post('/api/reclamos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ titulo: 'Reclamo ciudadano no permitido para institución' });
+
+      // Debe ser rechazada porque su rol no es ciudadano
+      expect(res.status).toBe(403);
+      expect(res.body.codigo).toBe('ROL_NO_AUTORIZADO');
+      expect(res.body.rolActual).toBe('institucion');
     });
 
     test('Institución verificada (verificada = 1) accede correctamente a operaciones institucionales', async () => {
