@@ -42,18 +42,34 @@ const claimController = {
 
   async lista(req, res, next) {
     try {
-      const { estado, pagina = 1, limite = 20 } = req.query;
-      if ((estado && !Object.values(CLAIM_STATUSES).includes(estado)) || !/^\d+$/.test(String(pagina)) || !/^\d+$/.test(String(limite)) || Number(pagina) < 1 || Number(limite) < 1 || Number(limite) > 100) return res.status(400).json({ ok: false, mensaje: 'Filtros o paginaci?n inválidos' });
+      const { estado, busqueda, categoria, ciudad, pagina = 1, limite = 20 } = req.query;
+      if (
+        (estado && estado !== 'Todos' && !Object.values(CLAIM_STATUSES).includes(estado)) ||
+        !/^\d+$/.test(String(pagina)) ||
+        !/^\d+$/.test(String(limite)) ||
+        Number(pagina) < 1 ||
+        Number(limite) < 1 ||
+        Number(limite) > 100
+      ) {
+        return res.status(400).json({ ok: false, mensaje: 'Filtros o paginación inválidos' });
+      }
+
       const result = await ClaimModel.getLista({
         estado: estado || null,
-        pagina: parseInt(pagina),
-        limite: parseInt(limite),
+        busqueda: busqueda || null,
+        categoria: categoria || null,
+        ciudad: ciudad || null,
+        pagina: parseInt(pagina, 10),
+        limite: parseInt(limite, 10),
       });
+
       res.json({
         ok: true,
         data: result.rows,
         total: result.total,
-        totalPaginas: Math.ceil(result.total / parseInt(limite)),
+        pagina: parseInt(pagina, 10),
+        limite: parseInt(limite, 10),
+        totalPaginas: Math.ceil(result.total / parseInt(limite, 10)) || 1,
       });
     } catch (err) {
       next(err);
@@ -78,17 +94,23 @@ const claimController = {
   async reasignarInstitucion(req, res, next) {
     try {
       const { id } = req.params;
-      const { id_institucion } = req.body;
+      const { id_institucion, motivo } = req.body;
       const idUsuarioAdmin = req.user.id;
       
       if (!id_institucion) {
         return res.status(400).json({ ok: false, mensaje: 'La institución destino es obligatoria' });
       }
 
+      if (motivo !== undefined && (!motivo || !String(motivo).trim())) {
+        return res.status(400).json({ ok: false, mensaje: 'El motivo de reasignación es obligatorio' });
+      }
+
       if (!Number.isSafeInteger(Number(id_institucion)) || Number(id_institucion) <= 0 || !Number.isSafeInteger(Number(id)) || Number(id) <= 0) {
         return res.status(400).json({ ok: false, mensaje: 'Identificador inválido' });
       }
-      await ClaimModel.reasignarInstitucion(id, Number(id_institucion), idUsuarioAdmin, typeof req.body.motivo === 'string' ? req.body.motivo.trim() : '');
+
+      const motivoLimpio = typeof motivo === 'string' ? motivo.trim() : '';
+      await ClaimModel.reasignarInstitucion(id, Number(id_institucion), idUsuarioAdmin, motivoLimpio);
 
       res.json({ ok: true, mensaje: 'Reclamo reasignado exitosamente' });
     } catch (err) {

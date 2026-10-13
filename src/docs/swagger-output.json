@@ -176,6 +176,27 @@
             }
           },
           {
+            "name": "busqueda",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoria",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ciudad",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "pagina",
             "in": "query",
             "schema": {
@@ -306,10 +327,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "motivo": {
+                  "id_institucion": {
                     "example": "any"
                   },
-                  "id_institucion": {
+                  "motivo": {
                     "example": "any"
                   }
                 }

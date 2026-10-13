@@ -430,18 +430,80 @@ const ClaimModel = {
     const { rows } = await this.getLista({ pagina: 1, limite });
     return rows;
   },
-  async getLista({ estado = null, pagina = 1, limite = 20 }) {
-    const where = estado ? 'WHERE r.estado = ?' : '';
-    const params = estado ? [estado] : [];
-    const [[count]] = await db.query(`SELECT COUNT(*) AS total FROM reclamos r ${where}`, params);
-    const [rows] = await db.query(`SELECT r.id_reclamo AS id, r.titulo, r.estado, r.fecha_creacion,
-      r.id_ciudad, r.id_institucion, c.nombre AS categoriaNombre, i.nombre AS institucionNombre,
-      u.email AS autorNombre FROM reclamos r
+  async getLista({ estado = null, busqueda = null, categoria = null, ciudad = null, pagina = 1, limite = 20 } = {}) {
+    let where = 'WHERE 1=1';
+    const params = [];
+
+    if (estado && estado !== 'Todos') {
+      where += ' AND r.estado = ?';
+      params.push(estado);
+    }
+
+    if (categoria && categoria !== 'Todas') {
+      where += ' AND r.id_categoria = ?';
+      params.push(categoria);
+    }
+
+    if (ciudad) {
+      where += ' AND r.id_ciudad = ?';
+      params.push(ciudad);
+    }
+
+    if (busqueda && String(busqueda).trim()) {
+      const term = `%${String(busqueda).trim()}%`;
+      if (/^\d+$/.test(String(busqueda).trim())) {
+        where += ' AND (r.id_reclamo = ? OR r.titulo LIKE ? OR r.direccion LIKE ?)';
+        params.push(Number(String(busqueda).trim()), term, term);
+      } else {
+        where += ' AND (r.titulo LIKE ? OR r.direccion LIKE ? OR u.email LIKE ? OR i.nombre LIKE ?)';
+        params.push(term, term, term, term);
+      }
+    }
+
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM reclamos r
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
       LEFT JOIN instituciones i ON i.id_institucion = r.id_institucion
       LEFT JOIN usuarios u ON u.id_usuario = r.id_usuario
-      ${where} ORDER BY r.fecha_creacion DESC, r.id_reclamo DESC LIMIT ? OFFSET ?`, [...params, limite, (pagina - 1) * limite]);
-    return { rows, total: Number(count.total) };
+      ${where}
+    `;
+    const [[count]] = await db.query(countSql, params);
+    const total = Number(count?.total || 0);
+
+    const parsedPagina = Math.max(1, parseInt(pagina, 10) || 1);
+    const parsedLimite = Math.max(1, parseInt(limite, 10) || 20);
+    const offset = (parsedPagina - 1) * parsedLimite;
+
+    const dataSql = `
+      SELECT
+        r.id_reclamo AS id,
+        r.id_reclamo,
+        r.titulo,
+        r.descripcion,
+        r.estado,
+        r.direccion,
+        r.fecha_creacion,
+        r.fecha_ultimo_cambio_estado,
+        r.id_ciudad,
+        r.id_institucion,
+        r.id_categoria,
+        c.nombre AS categoriaNombre,
+        i.nombre AS institucionNombre,
+        u.email AS autorNombre,
+        ciud.nombre AS ciudadNombre
+      FROM reclamos r
+      LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
+      LEFT JOIN instituciones i ON i.id_institucion = r.id_institucion
+      LEFT JOIN usuarios u ON u.id_usuario = r.id_usuario
+      LEFT JOIN ciudades ciud ON ciud.id_ciudad = r.id_ciudad
+      ${where}
+      ORDER BY r.fecha_creacion DESC, r.id_reclamo DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await db.query(dataSql, [...params, parsedLimite, offset]);
+    return { rows, total };
   },
   async getActividadMensual() {
     const [rows] = await db.query(`SELECT MONTH(fecha_creacion) AS mes, COUNT(*) AS total FROM reclamos
