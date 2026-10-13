@@ -164,6 +164,18 @@ describe('Módulo de Supervisión de Reclamos (ADMIN-01 — Etapa 5)', () => {
       expect(res.body.mensaje).toMatch(/institución destino es obligatoria/i);
     });
 
+    test('rechaza si motivo no se envía (undefined) → 400', async () => {
+      mockDbQuery({});
+
+      const res = await request(app)
+        .patch('/api/admin/reclamos/10/institucion')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ id_institucion: 5 });
+
+      expect(res.status).toBe(400);
+      expect(res.body.mensaje).toMatch(/motivo de reasignación es obligatorio/i);
+    });
+
     test('rechaza si motivo está vacío/espacios → 400', async () => {
       mockDbQuery({});
 
@@ -174,6 +186,18 @@ describe('Módulo de Supervisión de Reclamos (ADMIN-01 — Etapa 5)', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.mensaje).toMatch(/motivo de reasignación es obligatorio/i);
+    });
+
+    test('rechaza si los identificadores no son números enteros positivos → 400', async () => {
+      mockDbQuery({});
+
+      const res = await request(app)
+        .patch('/api/admin/reclamos/abc/institucion')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ id_institucion: -5, motivo: 'Cambio de área' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.mensaje).toMatch(/identificador inválido/i);
     });
   });
 });

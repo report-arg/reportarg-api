@@ -101,7 +101,7 @@ const claimController = {
         return res.status(400).json({ ok: false, mensaje: 'La institución destino es obligatoria' });
       }
 
-      if (motivo !== undefined && (!motivo || !String(motivo).trim())) {
+      if (!motivo || !String(motivo).trim()) {
         return res.status(400).json({ ok: false, mensaje: 'El motivo de reasignación es obligatorio' });
       }
 
