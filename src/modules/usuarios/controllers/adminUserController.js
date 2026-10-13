@@ -1,5 +1,5 @@
 const UserModel = require('../models/userModel');
-const db = require('../../../config/db');
+const { ROLES } = require('../../../constants/roles');
 
 const userController = {
 
@@ -45,15 +45,14 @@ const userController = {
         return res.status(400).json({ ok: false, mensaje: 'La contraseña debe tener al menos 6 caracteres' });
       }
 
-      const rolesValidos = ['admin', 'ciudadano', 'institucion'];
-      const rolNormalizado = (rol || 'ciudadano').toLowerCase();
-      if (!rolesValidos.includes(rolNormalizado)) {
+      const rolNormalizado = (rol || ROLES.CIUDADANO).toLowerCase();
+      if (!Object.values(ROLES).includes(rolNormalizado)) {
         return res.status(400).json({ ok: false, mensaje: 'Rol inválido. Roles permitidos: admin, ciudadano' });
       }
 
       // Restricción: el alta de instituciones debe realizarse por el flujo institucional formal
       // para asegurar la asignación territorial (ciudad/provincia), tipo de entidad y datos de contacto requeridos.
-      if (rolNormalizado === 'institucion') {
+      if (rolNormalizado === ROLES.INSTITUCION) {
         return res.status(400).json({
           ok: false,
           mensaje: 'El alta de cuentas institucionales debe realizarse a través del registro institucional (/register/institution) para garantizar su asignación territorial, tipo de entidad y datos de contacto requeridos.',
@@ -66,24 +65,15 @@ const userController = {
         return res.status(409).json({ ok: false, mensaje: 'El email ya está registrado' });
       }
 
-      // Crear usuario en tabla usuarios
-      const id = await UserModel.create({
+      // Crear usuario y perfil de forma atómica y transaccional
+      const id = await UserModel.createWithProfile({
         email,
         password,
         rol: rolNormalizado,
         estado: estado || 'activo',
+        nombre,
+        foto,
       });
-
-      // Si es ciudadano o admin crear registro en tabla ciudadanos para preservar nombre y foto
-      if (rolNormalizado === 'ciudadano' || rolNormalizado === 'admin') {
-        const partes = (nombre || "").trim().split(" ");
-        const nombreCiudadano   = partes[0] || (rolNormalizado === 'admin' ? "Administrador" : "");
-        const apellidoCiudadano = partes.slice(1).join(" ") || "";
-        await db.query(`
-          INSERT INTO ciudadanos (id_usuario, nombre, apellido, foto_perfil)
-          VALUES (?, ?, ?, ?)
-        `, [id, nombreCiudadano, apellidoCiudadano, foto || null]);
-      }
 
       // Enviar email de bienvenida si está disponible el servicio
       try {
@@ -156,31 +146,9 @@ const userController = {
         } catch (_) {}
       }
 
-      // Actualizar nombre y/o foto según el rol
+      // Actualizar nombre y/o foto según el rol delegando en la capa de modelo
       if (nombre !== undefined || foto) {
-        if (nuevoRol === 'institucion') {
-          const updates = [];
-          const params = [];
-          if (nombre) { updates.push('nombre = ?'); params.push(nombre); }
-          if (foto) { updates.push('foto_perfil = ?'); params.push(foto); }
-          if (updates.length > 0) {
-            params.push(id);
-            await db.query(`UPDATE instituciones SET ${updates.join(', ')} WHERE id_usuario = ?`, params);
-          }
-        } else {
-          // Ciudadano o Admin
-          const partes = (nombre || usuarioActual.nombre || "").trim().split(" ");
-          const nombreCiudadano = partes[0] || "";
-          const apellidoCiudadano = partes.slice(1).join(" ") || "";
-          await db.query(`
-            INSERT INTO ciudadanos (id_usuario, nombre, apellido, foto_perfil)
-            VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-              nombre = VALUES(nombre),
-              apellido = VALUES(apellido),
-              foto_perfil = COALESCE(VALUES(foto_perfil), foto_perfil)
-          `, [id, nombreCiudadano, apellidoCiudadano, foto || null]);
-        }
+        await UserModel.updateProfileData(id, nuevoRol, { nombre, foto, usuarioActual });
       }
 
       res.json({ ok: true, mensaje: 'Usuario actualizado correctamente' });
@@ -193,9 +161,9 @@ const userController = {
     try {
       const { id } = req.params;
       const { rol } = req.body;
-      const rolesValidos = ['admin', 'ciudadano', 'institucion'];
+      const rolesValidos = Object.values(ROLES);
       if (!rol || !rolesValidos.includes(rol.toLowerCase())) {
-        return res.status(400).json({ ok: false, mensaje: 'Rol inválido. Roles válidos: admin, ciudadano, institucion' });
+        return res.status(400).json({ ok: false, mensaje: `Rol inválido. Roles válidos: ${rolesValidos.join(', ')}` });
       }
 
       const nuevoRol = rol.toLowerCase();

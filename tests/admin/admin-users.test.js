@@ -5,19 +5,21 @@ const db = require('../../src/config/db');
 const { ROLES } = require('../../src/constants/roles');
 const { generateTestToken } = require('../helpers/auth');
 
-jest.mock('../../src/config/db', () => ({
-  query: jest.fn(),
-  getConnection: jest.fn((cb) => {
-    if (cb) cb(null, { release: jest.fn() });
-    return Promise.resolve({
-      query: jest.fn().mockResolvedValue([[]]),
-      beginTransaction: jest.fn(),
-      commit: jest.fn(),
-      rollback: jest.fn(),
+jest.mock('../../src/config/db', () => {
+  const query = jest.fn();
+  const getConnection = jest.fn((cb) => {
+    const conn = {
+      query: jest.fn((...args) => query(...args)),
+      beginTransaction: jest.fn().mockResolvedValue(true),
+      commit: jest.fn().mockResolvedValue(true),
+      rollback: jest.fn().mockResolvedValue(true),
       release: jest.fn(),
-    });
-  }),
-}));
+    };
+    if (cb) cb(null, conn);
+    return Promise.resolve(conn);
+  });
+  return { query, getConnection };
+});
 jest.mock('../../src/services/emailService', () => ({
   enviarBienvenida: jest.fn().mockResolvedValue(true),
   enviarCodigoVerificacion: jest.fn().mockResolvedValue(true),

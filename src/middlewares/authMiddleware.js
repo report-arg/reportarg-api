@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const { ROLES, normalizeRole } = require('../constants/roles');
+const { ROLES, normalizeRole, getCanonicalRole } = require('../constants/roles');
 
 const getUserFromToken = async (req) => {
   const authHeader = req.headers['authorization'];
@@ -13,20 +13,39 @@ const getUserFromToken = async (req) => {
     if (!decoded?.id) return null;
 
     const [rows] = await db.query(
-      `SELECT u.id_usuario, u.email, u.activo, u.tipo_usuario, u.id_ciudad, i.id_institucion
+      `SELECT u.id_usuario, u.email, u.activo, u.tipo_usuario, u.id_ciudad, i.id_institucion, i.verificada AS institucion_verificada
        FROM usuarios u
        LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
        WHERE u.id_usuario = ?`,
       [decoded.id]
     );
-    const userDb = rows[0];
+    const userDb = rows && rows[0];
 
+    // Si el usuario no existe en BD o fue inhabilitado (activo = 0), denegar acceso inmediatamente
     if (!userDb || !userDb.activo) return null;
+
+    // El rol autorizado DEBE provenir del usuario actual en base de datos y no del token JWT
+    const normalizedDbRole = getCanonicalRole(userDb.tipo_usuario);
+
+    // Regla estricta: No utilizar el rol del token como fallback cuando el rol de base de datos sea inexistente o inválido
+    if (!normalizedDbRole) {
+      return null;
+    }
+
+    let effectiveRole = normalizedDbRole;
+
+    // Si el rol en BD es institución pero la cuenta institucional no está verificada (verificada = 0),
+    // revocar los privilegios institucionales operativos asignando rol ciudadano
+    if (normalizedDbRole === ROLES.INSTITUCION) {
+      if (userDb.institucion_verificada !== undefined && userDb.institucion_verificada !== null && Number(userDb.institucion_verificada) === 0) {
+        effectiveRole = ROLES.CIUDADANO;
+      }
+    }
 
     return {
       id: userDb.id_usuario,
       email: userDb.email,
-      role: normalizeRole(decoded.role || userDb.tipo_usuario),
+      role: effectiveRole,
       id_ciudad: userDb.id_ciudad || null,
       id_institucion: userDb.id_institucion || null,
     };
