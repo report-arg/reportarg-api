@@ -1,21 +1,34 @@
+const defaultQueryMock = async (sql, params) => {
+  if (typeof sql === 'string' && sql.includes('COUNT(*)')) {
+    return [[{ total: 0 }]];
+  }
+  if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+    const userId = params ? Number(params[0]) : 1;
+    return [[{
+      id_usuario: userId,
+      email: 'test@domain.com',
+      activo: 1,
+      tipo_usuario: userId === 3 ? 'admin' : (userId === 2 || userId === 44) ? 'institucion' : 'ciudadano',
+      id_ciudad: 1,
+      id_institucion: (userId === 2 || userId === 44) ? 10 : null,
+      institucion_verificada: 1,
+    }]];
+  }
+  if (typeof sql === 'string' && sql.includes('u.id_usuario AS id')) {
+    const userId = params ? Number(params[0]) : 1;
+    return [[{
+      id: userId,
+      email: 'test@domain.com',
+      rol: userId === 3 ? 'admin' : 'ciudadano',
+      tipo_usuario: userId === 3 ? 'admin' : 'ciudadano',
+      estado: 'activo',
+    }]];
+  }
+  return [[]];
+};
+
 jest.mock('../../src/config/db', () => ({
-  query: jest.fn(async (sql, params) => {
-    if (typeof sql === 'string' && sql.includes('COUNT(*)')) {
-      return [[{ total: 0 }]];
-    }
-    if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
-      const userId = params ? params[0] : 1;
-      return [[{
-        id_usuario: userId,
-        email: 'test@domain.com',
-        activo: 1,
-        tipo_usuario: userId === 3 ? 'admin' : userId === 2 ? 'institucion' : 'ciudadano',
-        id_ciudad: 1,
-        id_institucion: userId === 2 ? 10 : null,
-      }]];
-    }
-    return [[]];
-  }),
+  query: jest.fn(),
   getConnection: jest.fn(async () => ({
     query: jest.fn().mockResolvedValue([[]]),
     beginTransaction: jest.fn(),
@@ -36,6 +49,9 @@ const db = require('../../src/config/db');
 const { generateTestToken, ROLES } = require('../helpers/auth');
 
 describe('Seguridad y control de acceso', () => {
+  beforeEach(() => {
+    db.query.mockImplementation(defaultQueryMock);
+  });
   describe('GET /api/admin/usuarios', () => {
     test('sin token → 401', async () => {
       const res = await request(app).get('/api/admin/usuarios');

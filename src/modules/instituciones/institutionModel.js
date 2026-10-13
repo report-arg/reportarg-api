@@ -121,21 +121,32 @@ const InstitutionModel = {
   },
 
   async verificar(id) {
-    const [result] = await db.query(`
-      UPDATE instituciones
-      SET verificada = 1, fecha_verificacion = NOW()
-      WHERE id_institucion = ?
-    `, [id]);
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
 
-    // Asegurar consistencia del rol institucional en usuarios si no era admin
-    await db.query(`
-      UPDATE usuarios u
-      INNER JOIN instituciones i ON i.id_usuario = u.id_usuario
-      SET u.tipo_usuario = 'institucion'
-      WHERE i.id_institucion = ? AND u.tipo_usuario != 'admin'
-    `, [id]);
+      const [result] = await connection.query(`
+        UPDATE instituciones
+        SET verificada = 1, fecha_verificacion = NOW()
+        WHERE id_institucion = ?
+      `, [id]);
 
-    return result.affectedRows;
+      // Asegurar consistencia atómica del rol institucional en usuarios si no era admin
+      await connection.query(`
+        UPDATE usuarios u
+        INNER JOIN instituciones i ON i.id_usuario = u.id_usuario
+        SET u.tipo_usuario = 'institucion'
+        WHERE i.id_institucion = ? AND u.tipo_usuario != 'admin'
+      `, [id]);
+
+      await connection.commit();
+      return result.affectedRows;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   },
 
   async rechazar(id) {

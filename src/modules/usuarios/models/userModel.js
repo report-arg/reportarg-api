@@ -175,7 +175,42 @@ const UserModel = {
     await db.query('UPDATE usuarios SET password = ? WHERE id_usuario = ?', [hash, id]);
   },
 
-  // Crear usuario
+  // Crear usuario con perfil de forma atómica y transaccional
+  async createWithProfile({ email, password, rol, estado = 'activo', id_ciudad = null, nombre, foto }) {
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash(password, 10);
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [result] = await connection.query(`
+        INSERT INTO usuarios (email, password, tipo_usuario, activo, id_ciudad)
+        VALUES (?, ?, ?, ?, ?)
+      `, [email, hash, rol.toLowerCase(), estado === 'activo' ? 1 : 0, id_ciudad]);
+      const newUserId = result.insertId;
+
+      // Si es ciudadano o admin, crear perfil en tabla ciudadanos dentro de la misma transacción
+      if (rol.toLowerCase() === 'ciudadano' || rol.toLowerCase() === 'admin') {
+        const partes = (nombre || "").trim().split(" ");
+        const nombreCiudadano   = partes[0] || (rol.toLowerCase() === 'admin' ? "Administrador" : "");
+        const apellidoCiudadano = partes.slice(1).join(" ") || "";
+        await connection.query(`
+          INSERT INTO ciudadanos (id_usuario, nombre, apellido, foto_perfil)
+          VALUES (?, ?, ?, ?)
+        `, [newUserId, nombreCiudadano, apellidoCiudadano, foto || null]);
+      }
+
+      await connection.commit();
+      return newUserId;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  },
+
+  // Crear usuario simple
   async create({ email, password, rol, estado, id_ciudad = null }) {
     const bcrypt = require('bcryptjs');
     const hash = await bcrypt.hash(password, 10);
@@ -184,6 +219,32 @@ const UserModel = {
       VALUES (?, ?, ?, ?, ?)
     `, [email, hash, rol.toLowerCase(), estado === 'activo' ? 1 : 0, id_ciudad]);
     return result.insertId;
+  },
+
+  // Actualizar datos de perfil (nombre y foto) según el rol sin exponer SQL en el controlador
+  async updateProfileData(userId, rol, { nombre, foto, usuarioActual }) {
+    if (rol === 'institucion') {
+      const updates = [];
+      const params = [];
+      if (nombre) { updates.push('nombre = ?'); params.push(nombre); }
+      if (foto) { updates.push('foto_perfil = ?'); params.push(foto); }
+      if (updates.length > 0) {
+        params.push(userId);
+        await db.query(`UPDATE instituciones SET ${updates.join(', ')} WHERE id_usuario = ?`, params);
+      }
+    } else {
+      const partes = (nombre || usuarioActual?.nombre || "").trim().split(" ");
+      const nombreCiudadano = partes[0] || "";
+      const apellidoCiudadano = partes.slice(1).join(" ") || "";
+      await db.query(`
+        INSERT INTO ciudadanos (id_usuario, nombre, apellido, foto_perfil)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          nombre = VALUES(nombre),
+          apellido = VALUES(apellido),
+          foto_perfil = COALESCE(VALUES(foto_perfil), foto_perfil)
+      `, [userId, nombreCiudadano, apellidoCiudadano, foto || null]);
+    }
   },
 
   // Editar usuario
