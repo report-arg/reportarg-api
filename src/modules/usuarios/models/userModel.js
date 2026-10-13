@@ -47,47 +47,72 @@ const UserModel = {
   },
 
 
-  // Listar todos con filtros opcionales
-  async getAll({ busqueda, rol, estado } = {}) {
+  // Listar todos con filtros opcionales y paginación
+  async getAll({ busqueda, rol, estado, pagina = 1, limite = 20 } = {}) {
+    let where = 'WHERE 1=1';
+    const params = [];
+
+    if (busqueda) {
+      where += ` AND (u.email LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ? OR i.nombre LIKE ?)`;
+      params.push(`%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`);
+    }
+    if (rol && rol !== 'Todos') {
+      where += ` AND u.tipo_usuario = ?`;
+      params.push(rol.toLowerCase());
+    }
+    if (estado && estado !== 'Todos') {
+      where += ` AND u.activo = ?`;
+      params.push(estado === 'activo' ? 1 : 0);
+    }
+
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM usuarios u
+      LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
+      LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
+      ${where}
+    `;
+    const [countRows] = await db.query(countSql, params);
+    const totalCount = countRows && countRows[0] && countRows[0].total !== undefined ? Number(countRows[0].total) : 0;
+
     let query = `
       SELECT 
-      u.id_usuario AS id,
-      u.email,
-      u.tipo_usuario AS rol,
-      u.id_ciudad,
-      CASE WHEN u.activo = 1 THEN 'activo' ELSE 'inactivo' END AS estado,
-      u.fecha_creacion,
-      COALESCE(
-        CONCAT(c.nombre, ' ', c.apellido),
-        i.nombre
-      ) AS nombre,
-      COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
-      ciud.nombre AS ciudad_activa,
-      ciud.provincia AS provincia_activa
+        u.id_usuario AS id,
+        u.email,
+        u.tipo_usuario AS rol,
+        u.id_ciudad,
+        CASE WHEN u.activo = 1 THEN 'activo' ELSE 'inactivo' END AS estado,
+        u.fecha_creacion,
+        COALESCE(
+          CONCAT(c.nombre, ' ', c.apellido),
+          i.nombre
+        ) AS nombre,
+        COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
+        ciud.nombre AS ciudad_activa,
+        ciud.provincia AS provincia_activa
       FROM usuarios u
       LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
       LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
       LEFT JOIN ciudades ciud ON ciud.id_ciudad = u.id_ciudad
-      WHERE 1=1
+      ${where}
+      ORDER BY u.id_usuario DESC
     `;
-    const params = [];
 
-    if (busqueda) {
-      query += ` AND (u.email LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ? OR i.nombre LIKE ?)`;
-      params.push(`%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`);
-    }
-    if (rol && rol !== 'Todos') {
-      query += ` AND u.tipo_usuario = ?`;
-      params.push(rol.toLowerCase());
-    }
-    if (estado && estado !== 'Todos') {
-      query += ` AND u.activo = ?`;
-      params.push(estado === 'activo' ? 1 : 0);
-    }
+    const paginaNum = Math.max(1, parseInt(pagina) || 1);
+    const limiteNum = Math.min(100, Math.max(1, parseInt(limite) || 20));
+    const offset = (paginaNum - 1) * limiteNum;
 
-    query += ` ORDER BY u.id_usuario DESC`;
-    const [rows] = await db.query(query, params);
-    return rows;
+    query += ` LIMIT ? OFFSET ?`;
+    const queryParams = [...params, limiteNum, offset];
+
+    const [rows] = await db.query(query, queryParams);
+    return {
+      rows: Array.isArray(rows) ? rows : [],
+      total: totalCount || (Array.isArray(rows) ? rows.length : 0),
+      pagina: paginaNum,
+      limite: limiteNum,
+      totalPaginas: Math.ceil((totalCount || (Array.isArray(rows) ? rows.length : 0)) / limiteNum) || 1,
+    };
   },
 
   // Obtener uno por ID con datos de ciudad activa y declarada
@@ -163,11 +188,15 @@ const UserModel = {
 
   // Editar usuario
   async update(id, { email, rol, estado, id_ciudad }) {
-    const [result] = await db.query(`
-      UPDATE usuarios
-      SET email = ?, tipo_usuario = ?, activo = ?, id_ciudad = ?
-      WHERE id_usuario = ?
-    `, [email, rol.toLowerCase(), estado === 'activo' ? 1 : 0, id_ciudad !== undefined ? id_ciudad : null, id]);
+    let query = `UPDATE usuarios SET email = ?, tipo_usuario = ?, activo = ?`;
+    const params = [email, rol.toLowerCase(), estado === 'activo' ? 1 : 0];
+    if (id_ciudad !== undefined) {
+      query += `, id_ciudad = ?`;
+      params.push(id_ciudad);
+    }
+    query += ` WHERE id_usuario = ?`;
+    params.push(id);
+    const [result] = await db.query(query, params);
     return result.affectedRows;
   },
 
@@ -179,12 +208,17 @@ const UserModel = {
     return result.affectedRows;
   },
 
+  // Cambiar estado activo/inactivo (rehabilitar / inhabilitar)
+  async setEstado(id, activo) {
+    const [result] = await db.query(`
+      UPDATE usuarios SET activo = ? WHERE id_usuario = ?
+    `, [activo ? 1 : 0, id]);
+    return result.affectedRows;
+  },
+
   // Baja lógica — no borra, cambia estado a 'inactivo'
   async delete(id) {
-    const [result] = await db.query(`
-      UPDATE usuarios SET activo = 0 WHERE id_usuario = ?
-    `, [id]);
-    return result.affectedRows;
+    return this.setEstado(id, false);
   },
 
   // Stats para el dashboard

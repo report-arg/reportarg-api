@@ -328,13 +328,25 @@ const authService = {
 
     try {
       const user = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+
+      // Verificar que el usuario no haya sido inhabilitado
+      const [rows] = await db.query('SELECT activo, tipo_usuario FROM usuarios WHERE id_usuario = ?', [user.id]);
+      const userDb = rows && rows[0];
+      if (!userDb || !userDb.activo) {
+        await RefreshTokenModel.deleteById(dbToken.id);
+        throwError(403, 'Cuenta deshabilitada');
+      }
+
+      const roleActual = await this.resolveUserRole(user.id, userDb.tipo_usuario);
+
       const newAccessToken = jwt.sign(
-        { id: user.id, email: user.email, role: normalizeRole(user.role) },
+        { id: user.id, email: user.email, role: normalizeRole(roleActual) },
         process.env.JWT_SECRET,
         { expiresIn: '15m' }
       );
       return newAccessToken;
     } catch (err) {
+      if (err.status) throw err;
       throwError(403, 'Refresh token no válido');
     }
   },
