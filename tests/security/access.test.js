@@ -121,6 +121,45 @@ describe('Seguridad y control de acceso', () => {
       );
       expect(res.body.data).toHaveLength(1);
     });
+
+    test('permite acceso a usuario con rol admin', async () => {
+      db.query.mockClear();
+      db.query.mockImplementation(async (sql, params) => {
+        if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+          return [[{ id_usuario: params[0], email: 'admin@test.com', activo: 1, tipo_usuario: 'admin' }]];
+        }
+        if (typeof sql === 'string' && sql.includes('FROM reclamos r')) {
+          return [[]];
+        }
+        return [[]];
+      });
+
+      const token = generateTestToken(ROLES.ADMIN, 99);
+      const res = await request(app)
+        .get('/api/reclamos/mis-reclamos')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data).toEqual([]);
+    });
+
+    test('bloquea acceso a usuario con rol institución → 403', async () => {
+      db.query.mockClear();
+      db.query.mockImplementation(async (sql, params) => {
+        if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+          return [[{ id_usuario: params[0], email: 'inst@test.com', activo: 1, tipo_usuario: 'institucion', id_institucion: 5 }]];
+        }
+        return [[]];
+      });
+
+      const token = generateTestToken(ROLES.INSTITUCION, 44);
+      const res = await request(app)
+        .get('/api/reclamos/mis-reclamos')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+    });
   });
 
   describe('POST /api/comunicados', () => {

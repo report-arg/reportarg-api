@@ -10,8 +10,8 @@ router.get('/categorias',   optionalToken, ctrl.categoriasParaReclamo);
 // Reclamos públicos de la ciudad
 router.get('/publicos',     verifyToken, ctrl.reclamosPublicos);
 
-// Reclamos personales del ciudadano (HU-06)
-router.get('/mis-reclamos', verifyToken, requireCiudadano, ctrl.misReclamos);
+// Reclamos personales del ciudadano y admin (HU-06)
+router.get('/mis-reclamos', verifyToken, requireRole(ROLES.CIUDADANO, ROLES.ADMIN), ctrl.misReclamos);
 
 // Datos para mapa público
 router.get('/mapa',         verifyToken, ctrl.reclamosParaMapa);
