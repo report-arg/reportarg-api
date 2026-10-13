@@ -16,10 +16,49 @@ const InstitutionModel = {
     );
   },
 
-  async getAll({ estado } = {}) {
-    let query = `
+  async getAll({ estado, busqueda, pagina = 1, limite = 20 } = {}) {
+    let where = ' WHERE 1=1';
+    const params = [];
+
+    if (estado === 'pendiente') {
+      where += ' AND i.verificada = 0';
+    } else if (estado === 'verificada') {
+      where += ' AND i.verificada = 1';
+    }
+
+    if (busqueda && busqueda.trim()) {
+      const term = `%${busqueda.trim()}%`;
+      where += ` AND (
+        i.nombre LIKE ?
+        OR u.email LIKE ?
+        OR i.tipo LIKE ?
+        OR c.nombre LIKE ?
+        OR c.provincia LIKE ?
+        OR i.direccion LIKE ?
+      )`;
+      params.push(term, term, term, term, term, term);
+    }
+
+    // Total de registros coincidentes
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM instituciones i
+      INNER JOIN usuarios u ON u.id_usuario = i.id_usuario
+      LEFT JOIN ciudades c ON c.id_ciudad = i.id_ciudad
+      ${where}
+    `;
+    const [[countResult]] = await db.query(countSql, params);
+    const total = countResult ? countResult.total : 0;
+
+    const parsedPagina = Math.max(1, parseInt(pagina, 10) || 1);
+    const parsedLimite = Math.max(1, parseInt(limite, 10) || 20);
+    const offset = (parsedPagina - 1) * parsedLimite;
+
+    // Consulta de registros con relación territorial y contacto
+    const dataSql = `
       SELECT
         i.id_institucion AS id,
+        i.id_institucion,
         i.nombre,
         i.tipo,
         i.id_ciudad,
@@ -27,28 +66,38 @@ const InstitutionModel = {
         i.telefono,
         i.verificada,
         i.fecha_verificacion,
+        i.foto_perfil,
+        u.id_usuario,
         u.email,
-        u.activo
+        u.activo,
+        c.nombre AS ciudad_nombre,
+        c.provincia AS provincia,
+        c.activa AS ciudad_activa
       FROM instituciones i
       INNER JOIN usuarios u ON u.id_usuario = i.id_usuario
-      WHERE 1=1
+      LEFT JOIN ciudades c ON c.id_ciudad = i.id_ciudad
+      ${where}
+      ORDER BY i.id_institucion DESC
+      LIMIT ? OFFSET ?
     `;
 
-    if (estado === 'pendiente') {
-      query += ` AND i.verificada = 0`;
-    } else if (estado === 'verificada') {
-      query += ` AND i.verificada = 1`;
-    }
+    const dataParams = [...params, parsedLimite, offset];
+    const [rows] = await db.query(dataSql, dataParams);
 
-    query += ` ORDER BY i.id_institucion DESC`;
-    const [rows] = await db.query(query);
-    return rows;
+    return {
+      rows,
+      total,
+      pagina: parsedPagina,
+      limite: parsedLimite,
+      totalPaginas: Math.ceil(total / parsedLimite) || 1,
+    };
   },
 
   async getById(id) {
     const [rows] = await db.query(`
       SELECT
         i.id_institucion AS id,
+        i.id_institucion,
         i.nombre,
         i.tipo,
         i.id_ciudad,
@@ -56,12 +105,16 @@ const InstitutionModel = {
         i.telefono,
         i.verificada,
         i.fecha_verificacion,
-        i.id_ciudad,
+        i.foto_perfil,
+        u.id_usuario,
         u.email,
         u.activo,
-        u.id_usuario
+        c.nombre AS ciudad_nombre,
+        c.provincia AS provincia,
+        c.activa AS ciudad_activa
       FROM instituciones i
       INNER JOIN usuarios u ON u.id_usuario = i.id_usuario
+      LEFT JOIN ciudades c ON c.id_ciudad = i.id_ciudad
       WHERE i.id_institucion = ?
     `, [id]);
     return rows[0] || null;
@@ -73,6 +126,15 @@ const InstitutionModel = {
       SET verificada = 1, fecha_verificacion = NOW()
       WHERE id_institucion = ?
     `, [id]);
+
+    // Asegurar consistencia del rol institucional en usuarios si no era admin
+    await db.query(`
+      UPDATE usuarios u
+      INNER JOIN instituciones i ON i.id_usuario = u.id_usuario
+      SET u.tipo_usuario = 'institucion'
+      WHERE i.id_institucion = ? AND u.tipo_usuario != 'admin'
+    `, [id]);
+
     return result.affectedRows;
   },
 

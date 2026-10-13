@@ -5,9 +5,16 @@ const institutionController = {
 
   async listar(req, res, next) {
     try {
-      const { estado } = req.query;
-      const instituciones = await InstitutionModel.getAll({ estado });
-      res.json({ ok: true, data: instituciones });
+      const { estado, busqueda, pagina = 1, limite = 20 } = req.query;
+      const result = await InstitutionModel.getAll({ estado, busqueda, pagina, limite });
+      res.json({
+        ok: true,
+        data: result.rows,
+        total: result.total,
+        pagina: result.pagina,
+        limite: result.limite,
+        totalPaginas: result.totalPaginas,
+      });
     } catch (err) {
       next(err);
     }

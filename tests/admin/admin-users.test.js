@@ -159,6 +159,26 @@ describe('Módulo de Administración de Usuarios (ADMIN-01 — Etapa 3)', () => 
       expect(res.body.ok).toBe(true);
       expect(res.body.id).toBe(10);
     });
+
+    test('intento de alta con rol institucion → 400 y orienta al registro institucional formal', async () => {
+      mockDbQuery({
+        extra: () => [[]],
+      });
+
+      const res = await request(app)
+        .post('/api/admin/usuarios')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          nombre: 'Hospital Central',
+          email: 'hospital@test.com',
+          password: 'password123',
+          rol: 'institucion',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.mensaje).toMatch(/registro institucional/i);
+    });
   });
 
   describe('3. Inhabilitación y Rehabilitación (PATCH /:id/estado)', () => {

@@ -48,7 +48,16 @@ const userController = {
       const rolesValidos = ['admin', 'ciudadano', 'institucion'];
       const rolNormalizado = (rol || 'ciudadano').toLowerCase();
       if (!rolesValidos.includes(rolNormalizado)) {
-        return res.status(400).json({ ok: false, mensaje: 'Rol inválido. Roles permitidos: admin, ciudadano, institucion' });
+        return res.status(400).json({ ok: false, mensaje: 'Rol inválido. Roles permitidos: admin, ciudadano' });
+      }
+
+      // Restricción: el alta de instituciones debe realizarse por el flujo institucional formal
+      // para asegurar la asignación territorial (ciudad/provincia), tipo de entidad y datos de contacto requeridos.
+      if (rolNormalizado === 'institucion') {
+        return res.status(400).json({
+          ok: false,
+          mensaje: 'El alta de cuentas institucionales debe realizarse a través del registro institucional (/register/institution) para garantizar su asignación territorial, tipo de entidad y datos de contacto requeridos.',
+        });
       }
 
       // Verificar email duplicado
@@ -64,14 +73,6 @@ const userController = {
         rol: rolNormalizado,
         estado: estado || 'activo',
       });
-
-      // Si es institución crear registro en tabla instituciones (pendiente de verificación)
-      if (rolNormalizado === 'institucion') {
-        await db.query(`
-          INSERT INTO instituciones (id_usuario, nombre, foto_perfil, verificada)
-          VALUES (?, ?, ?, 0)
-        `, [id, nombre || email, foto || null]);
-      }
 
       // Si es ciudadano o admin crear registro en tabla ciudadanos para preservar nombre y foto
       if (rolNormalizado === 'ciudadano' || rolNormalizado === 'admin') {
