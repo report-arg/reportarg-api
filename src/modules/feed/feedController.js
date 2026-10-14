@@ -1,5 +1,5 @@
 const FeedModel    = require('./feedModel');
-const CategoryModel = require('../categorias/categoryModel');
+const CategoryModel = require('../categorias/categoriaModel');
 
 const feedController = {
 

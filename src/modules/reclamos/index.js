@@ -15,7 +15,7 @@ module.exports = {
   ActualizacionModel: require('./models/actualizacionModel'),
 
   // Services
-  assignmentService: require('./services/assignmentService'),
-  claimFilterService: require('./services/claimFilterService'),
-  claimTrackingService: require('./services/claimTrackingService'),
+  asignacionService: require('./services/asignacionService'),
+  reclamoFilterService: require('./services/reclamoFilterService'),
+  reclamoTrackingService: require('./services/reclamoTrackingService'),
 };

@@ -1,5 +1,5 @@
-const NotificationModel = require('./notificationModel');
-const { NOTIFICATION_TYPES } = require('./notifications.constants');
+const NotificationModel = require('./notificacionModel');
+const { NOTIFICATION_TYPES } = require('./notificaciones.constants');
 
 /**
  * Servicio centralizado para generación y despacho de notificaciones internas (HU-22).

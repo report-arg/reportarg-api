@@ -1,7 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/adminReclamoController');
-const cityService = require('../../../services/cityService');
+const cityService = require('../../../services/ciudadService');
 
 router.get('/ciudades-activas', async (req, res, next) => {
   try { res.json({ ok: true, data: await cityService.listActive() }); }

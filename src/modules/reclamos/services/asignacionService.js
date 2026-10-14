@@ -1,4 +1,4 @@
-const InstitutionModel = require('../../instituciones/institutionModel');
+const InstitutionModel = require('../../instituciones/institucionModel');
 
 /**
  * Servicio para determinar automáticamente la institución responsable de un reclamo

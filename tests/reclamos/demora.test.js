@@ -7,7 +7,7 @@
  * Tests unitarios con fechas controladas (sin Date.now() real).
  */
 
-const { seguimiento, compararAtencion } = require('../../src/modules/reclamos/services/claimTrackingService');
+const { seguimiento, compararAtencion } = require('../../src/modules/reclamos/services/reclamoTrackingService');
 const { CLAIM_STATUSES } = require('../../src/constants/publication');
 
 const DIA_MS = 86400000;

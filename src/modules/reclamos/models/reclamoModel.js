@@ -1,6 +1,6 @@
 const db = require('../../../config/db');
 const { CLAIM_STATUSES } = require('../../../constants/publication');
-const { seguimiento, compararAtencion } = require('../services/claimTrackingService');
+const { seguimiento, compararAtencion } = require('../services/reclamoTrackingService');
 
 const ClaimModel = {
 
@@ -392,7 +392,7 @@ const ClaimModel = {
         detalle: `Institución anterior ID ${reclamo.id_institucion || 'Sin asignar'} -> nueva ${institucion.nombre} (ID ${idNuevaInstitucion}). Motivo: ${motivo || 'Intervención administrativa'}`,
         estado_anterior: reclamo.estado, estado_nuevo: reclamo.estado }, connection);
 
-      const NotificationService = require('../../notificaciones/notificationService');
+      const NotificationService = require('../../notificaciones/notificacionService');
       if (reclamo.id_usuario) {
         await NotificationService.notificarReasignacion({
           idReclamo,

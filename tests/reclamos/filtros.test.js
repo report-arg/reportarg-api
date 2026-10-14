@@ -6,7 +6,7 @@
  * Tests unitarios sin dependencias de base de datos.
  */
 
-const { filtrosReclamo } = require('../../src/modules/reclamos/services/claimFilterService');
+const { filtrosReclamo } = require('../../src/modules/reclamos/services/reclamoFilterService');
 const { CLAIM_STATUSES } = require('../../src/constants/publication');
 
 describe('HU-10: Servicio de Filtros de Reclamos (claimFilterService)', () => {

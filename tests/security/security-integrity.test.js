@@ -3,8 +3,8 @@ const app = require('../../src/app');
 const db = require('../../src/config/db');
 const { ROLES } = require('../../src/constants/roles');
 const { generateTestToken } = require('../helpers/auth');
-const InstitutionModel = require('../../src/modules/instituciones/institutionModel');
-const UserModel = require('../../src/modules/usuarios/models/userModel');
+const InstitutionModel = require('../../src/modules/instituciones/institucionModel');
+const UserModel = require('../../src/modules/usuarios/models/usuarioModel');
 
 // Mocks de servicios y base de datos
 jest.mock('../../src/config/db', () => ({

@@ -1,7 +1,7 @@
-const { filtrosReclamo } = require('../services/claimFilterService');
+const { filtrosReclamo } = require('../services/reclamoFilterService');
 const ClaimModel = require('../models/reclamoModel');
 const HistorialModel = require('../models/historialModel');
-const NotificationService = require('../../notificaciones/notificationService');
+const NotificationService = require('../../notificaciones/notificacionService');
 const { CLAIM_STATUSES, HISTORIAL_EVENTS } = require('../../../constants/publication');
 
 const institucionReclamoController = {

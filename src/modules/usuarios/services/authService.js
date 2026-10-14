@@ -1,11 +1,11 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const emailService = require('../../../services/emailService');
-const cityService = require('../../../services/cityService');
-const UserModel = require('../models/userModel');
+const cityService = require('../../../services/ciudadService');
+const UserModel = require('../models/usuarioModel');
 const RefreshTokenModel = require('../models/refreshTokenModel');
 const CiudadanoModel = require('../models/ciudadanoModel');
-const InstitutionModel = require('../../instituciones/institutionModel');
+const InstitutionModel = require('../../instituciones/institucionModel');
 const db = require('../../../config/db'); // Solo para connection.beginTransaction
 const { ROLES, normalizeRole } = require('../../../constants/roles');
 

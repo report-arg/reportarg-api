@@ -1,4 +1,4 @@
-const InstitutionModel = require('./institutionModel');
+const InstitutionModel = require('./institucionModel');
 const emailService     = require('../../services/emailService');
 
 const institutionController = {

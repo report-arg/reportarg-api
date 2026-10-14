@@ -1,5 +1,6 @@
 module.exports = {
-  categoryController: require('./categoryController'),
-  categoryRoutes: require('./categoryRoutes'),
-  CategoryModel: require('./categoryModel'),
+  categoriaController: require('./categoriaController'),
+  categoriaRoutes: require('./categoriaRoutes'),
+  CategoriaModel: require('./categoriaModel'),
 };
+
