@@ -37,7 +37,7 @@ Reglas breves:
 4. Mantené el aislamiento por ciudad en feed, reclamos, comunicados, mapa y consultas institucionales. No fijes Viale ni `id_ciudad = 1` en la lógica de ejecución; el backfill histórico no es una regla de negocio.
 5. Conservá la separación entre reclamos y comunicados. Los reclamos privados no deben aparecer en consultas públicas, mapas ni respuestas para usuarios sin permiso.
 6. Para reclamos, respetá la máquina de estados, las reglas de edición, cancelación, reapertura e historial que estén implementadas y documentadas. Consultá el código actual antes de modificar una transición. No inventes permisos o estados nuevos.
-7. La asignación de una institución depende de ciudad y categoría, con respaldo en la institución principal de esa misma ciudad. Reutilizá `src/modules/reclamos/services/assignmentService.js`; no dupliques la búsqueda en controladores.
+7. La asignación de una institución depende de ciudad y categoría, con respaldo en la institución principal de esa misma ciudad. Reutilizá `src/modules/reclamos/services/asignacionService.js`; no dupliques la búsqueda en controladores.
 8. Usá consultas parametrizadas. Si una operación modifica varias tablas que deben permanecer consistentes, evaluá una transacción y asegurá rollback ante error. Registrá los eventos de historial exigidos por el flujo.
 9. Conservá los contratos de respuesta existentes o actualizá de forma coordinada sus consumidores. No cambies nombres de campos, rutas o semántica de errores sin revisar frontend, pruebas y documentación.
 10. Validá entradas en el servidor y devolvé mensajes adecuados sin exponer credenciales, tokens, detalles SQL ni datos privados en respuestas o logs.
@@ -94,3 +94,26 @@ npm test
 - Si una operación debe actualizar datos e historial de manera conjunta, asegurá su consistencia mediante una transacción cuando corresponda.
 - Al modificar una respuesta de API, revisá todos sus consumidores y las pruebas relacionadas. Documentá cualquier cambio incompatible.
 - Las pruebas deben usar datos controlados y un entorno de prueba identificado. No utilices datos reales de Producción ni ejecutes operaciones destructivas sobre una base compartida para verificar código.
+
+## Convención oficial de nomenclatura
+
+Para garantizar coherencia y evitar fragmentación idiomática entre backend y frontend, se establece la siguiente convención obligatoria:
+
+1. **Conceptos de negocio en español obligatorio:**
+   - Todas las entidades del dominio deben nombrarse en español: `Reclamo`, `Institucion`, `Ciudadano`, `Usuario`, `Categoria`, `Comunicado`, `Solicitud`, `Ciudad`, `Notificacion`, `Comentario`.
+   - **Prohibición:** No introduzcas variantes nuevas en inglés como `Claim`, `Institution`, `Citizen` o `Category` cuando te refieras a conceptos del dominio propio de ReportARG.
+2. **Patrones técnicos en inglés permitidos:**
+   - Se conservan en inglés los términos técnicos habituales de la industria y frameworks: `Service`, `Controller`, `Model`, `Routes`, `Middleware`, `Token`, `Auth`, `Provider`, `Config`, `Error`.
+3. **Estructura de módulos y archivos:**
+   - Carpetas de dominio en español: `src/modules/reclamos/`, `src/modules/instituciones/`, `src/modules/usuarios/`, `src/modules/categorias/`, `src/modules/comunicados/`, `src/modules/comentarios/`, `src/modules/notificaciones/`.
+   - Modelos: `[entidad]Model.js` (ej. `reclamoModel.js`, `institucionModel.js`, `categoriaModel.js`, `usuarioModel.js`, `notificacionModel.js`).
+   - Controladores: `[entidad]Controller.js` o `[ambito][Entidad]Controller.js` (ej. `reclamoController.js`, `adminReclamoController.js`, `institucionController.js`, `categoriaController.js`, `adminUsuarioController.js`).
+   - Servicios: `[entidad]Service.js` (ej. `reclamoWorkflowService.js`, `reclamoFilterService.js`, `reclamoTrackingService.js`, `asignacionService.js`, `ciudadService.js`, `notificacionService.js`).
+   - Rutas: `[entidad]Routes.js` o `[ambito][Entidad]Routes.js` (ej. `reclamoRoutes.js`, `adminReclamoRoutes.js`, `institucionRoutes.js`, `categoriaRoutes.js`, `adminUsuarioRoutes.js`, `ciudadRoutes.js`).
+4. **Contratos externos y compatibilidad:**
+   - **Prohibición estricta:** No modifiques contratos externos (endpoints HTTP, parámetros de query o body, claves de respuestas JSON, nombres de tablas ni columnas SQL) únicamente por motivos de nomenclatura interna.
+   - Respeta siempre los nombres existentes de endpoints (`/api/admin/usuarios`, `/api/admin/instituciones`, etc.) y las tablas de base de datos (`usuarios`, `reclamos`, `instituciones`, `tipo_usuario`, etc.).
+   - Los roles canónicos son `'admin'`, `'ciudadano'`, `'institucion'`. Conservá intacto `ROLE_ALIASES` en `src/constants/roles.js` (incluyendo `'usuario'`) para preservar la compatibilidad con los datos reales existentes en la base de datos hasta que se apruebe formalmente una migración de datos.
+5. **Mantenimiento y trazabilidad:**
+   - Reutilizá los componentes, modelos, servicios y utilidades existentes antes de crear otros nuevos.
+   - Al renombrar archivos o métodos, es obligatorio actualizar en el mismo paso todos los `require`, imports, exports, tests unitarios y referencias en la documentación para evitar archivos huérfanos o fallos en ejecución.
