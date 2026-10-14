@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const ctrl = require('../controllers/adminUserController');
+const ctrl = require('../controllers/adminUsuarioController');
 
 router.get('/',                        ctrl.listar);
 router.get('/stats',                   ctrl.stats);

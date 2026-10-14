@@ -1,18 +1,18 @@
-const CategoryModel = require('../../categorias/categoryModel');
-const ClaimModel    = require('../models/reclamoModel');
+const CategoriaModel = require('../../categorias/categoriaModel');
+const ReclamoModel    = require('../models/reclamoModel');
 const HistorialModel = require('../models/historialModel');
 const ActualizacionModel = require('../models/actualizacionModel');
-const NotificationService = require('../../notificaciones/notificationService');
-const { NOTIFICATION_TYPES } = require('../../notificaciones/notifications.constants');
-const { resolverInstitucionAsignada } = require('../services/assignmentService');
+const NotificacionService = require('../../notificaciones/notificacionService');
+const { NOTIFICATION_TYPES } = require('../../notificaciones/notificaciones.constants');
+const { resolverInstitucionAsignada } = require('../services/asignacionService');
 const { CATEGORY_TYPES, HISTORIAL_EVENTS, CLAIM_STATUSES } = require('../../../constants/publication');
 
 const { ROLES } = require('../../../constants/roles');
 const { BUSINESS_RULES } = require('../../../constants/businessRules');
-const { filtrosReclamo } = require('../services/claimFilterService');
-const cityService = require('../../../services/cityService');
-const InstitutionModel = require('../../instituciones/institutionModel');
-const claimWorkflowService = require('../services/claimWorkflowService');
+const { filtrosReclamo } = require('../services/reclamoFilterService');
+const ciudadService = require('../../../services/ciudadService');
+const InstitucionModel = require('../../instituciones/institucionModel');
+const reclamoWorkflowService = require('../services/reclamoWorkflowService');
 
 const reclamoController = {
 
@@ -22,15 +22,15 @@ const reclamoController = {
    */
   async categoriasParaReclamo(req, res, next) {
     try {
-      const data = await CategoryModel.getParaReclamo();
+      const data = await CategoriaModel.getParaReclamo();
       const id_ciudad = req.user?.id_ciudad || req.query.id_ciudad || 1;
 
-      const principal = await InstitutionModel.getPrincipalDeCiudad(id_ciudad);
+      const principal = await InstitucionModel.getPrincipalDeCiudad(id_ciudad);
       const nombrePrincipal = principal?.nombre || null;
 
       const categoriasConInstitucion = await Promise.all(
         data.map(async (cat) => {
-          const direct = await InstitutionModel.getPorCategoriaYCiudad(cat.id, id_ciudad);
+          const direct = await InstitucionModel.getPorCategoriaYCiudad(cat.id, id_ciudad);
           return {
             ...cat,
             institucion_responsable: direct?.nombre || nombrePrincipal
@@ -55,7 +55,7 @@ const reclamoController = {
         id_ciudad = req.body.id_ciudad;
       }
 
-      const id = await claimWorkflowService.crearReclamo({
+      const id = await reclamoWorkflowService.crearReclamo({
         ...req.body,
         id_usuario,
         id_ciudad,
@@ -80,7 +80,7 @@ const reclamoController = {
    */
   async misReclamos(req, res, next) {
     try {
-      const data = await ClaimModel.getByUsuario(req.user.id, filtrosReclamo(req.query));
+      const data = await ReclamoModel.getByUsuario(req.user.id, filtrosReclamo(req.query));
       res.json({ ok: true, data });
     } catch (err) {
       next(err);
@@ -98,7 +98,7 @@ const reclamoController = {
       if (!id_ciudad) {
         return res.json({ ok: true, data: [] });
       }
-      const data = await ClaimModel.getPublicosPorCiudad(id_ciudad, id_usuario, filtros);
+      const data = await ReclamoModel.getPublicosPorCiudad(id_ciudad, id_usuario, filtros);
       res.json({ ok: true, data });
     } catch (err) {
       next(err);
@@ -111,7 +111,7 @@ const reclamoController = {
   async obtenerDetalle(req, res, next) {
     try {
       const { id } = req.params;
-      const reclamo = await ClaimModel.getById(id);
+      const reclamo = await ReclamoModel.getById(id);
 
       if (!reclamo) {
         return res.status(404).json({ ok: false, mensaje: 'Reclamo no encontrado' });
@@ -137,7 +137,7 @@ const reclamoController = {
       
       let isAfectado = false;
       if (req.user?.id) {
-        isAfectado = await ClaimModel.isAfectado(id, req.user.id);
+        isAfectado = await ReclamoModel.isAfectado(id, req.user.id);
       }
 
       res.json({
@@ -174,7 +174,7 @@ const reclamoController = {
   async editar(req, res, next) {
     try {
       const { id } = req.params;
-      await claimWorkflowService.editarReclamo(id, req.user.id, req.body);
+      await reclamoWorkflowService.editarReclamo(id, req.user.id, req.body);
       res.json({ ok: true, mensaje: 'Reclamo editado correctamente.' });
     } catch (err) {
       if (err.status) {
@@ -191,7 +191,7 @@ const reclamoController = {
     try {
       const { id } = req.params;
       const { motivo } = req.body;
-      await claimWorkflowService.cancelarReclamo(id, req.user.id, motivo);
+      await reclamoWorkflowService.cancelarReclamo(id, req.user.id, motivo);
       res.json({ ok: true, mensaje: 'Reclamo cancelado exitosamente.' });
     } catch (err) {
       if (err.status) {
@@ -210,7 +210,7 @@ const reclamoController = {
       if (!id_ciudad) {
         return res.json({ ok: true, data: [] });
       }
-      const data = await ClaimModel.getParaMapa(id_ciudad);
+      const data = await ReclamoModel.getParaMapa(id_ciudad);
       res.json({ ok: true, data });
     } catch (err) {
       next(err);
@@ -223,7 +223,7 @@ const reclamoController = {
     try {
       const { id } = req.params;
       const { motivo } = req.body;
-      const estadoDestino = await claimWorkflowService.reabrirReclamo(id, req.user.id, motivo);
+      const estadoDestino = await reclamoWorkflowService.reabrirReclamo(id, req.user.id, motivo);
       res.json({ ok: true, mensaje: 'Reclamo reabierto exitosamente.', estado: estadoDestino });
     } catch (err) {
       if (err.status) {
@@ -248,7 +248,7 @@ const reclamoController = {
       const rolUsuario = req.user.role;
       const idInstitucionUsuario = req.user.id_institucion;
 
-      await claimWorkflowService.agregarActualizacion(id, idUsuario, rolUsuario, idInstitucionUsuario, texto);
+      await reclamoWorkflowService.agregarActualizacion(id, idUsuario, rolUsuario, idInstitucionUsuario, texto);
       res.json({ ok: true, mensaje: 'Actualización agregada correctamente' });
     } catch (err) {
       if (err.status) {
@@ -264,7 +264,7 @@ const reclamoController = {
   async toggleAfectado(req, res, next) {
     try {
       const { id } = req.params;
-      const afectado = await claimWorkflowService.toggleAfectado(id, req.user.id, req.user.role, req.user.id_ciudad);
+      const afectado = await reclamoWorkflowService.toggleAfectado(id, req.user.id, req.user.role, req.user.id_ciudad);
       const mensaje = afectado ? 'Has sido marcado como afectado por este reclamo' : 'Has dejado de estar afectado por este reclamo';
       res.json({ ok: true, mensaje, afectado });
     } catch (err) {

@@ -197,7 +197,7 @@ const logout = async (req, res, next) => {
 
 const me = async (req, res, next) => {
   try {
-    const UserModel = require('../models/userModel');
+    const UserModel = require('../models/usuarioModel');
     const usuario = await UserModel.getById(req.user.id);
     if (!usuario) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
     return res.json({ ok: true, data: usuario });

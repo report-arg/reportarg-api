@@ -1,8 +1,9 @@
 module.exports = {
   authController: require('./controllers/authController'),
-  adminUserController: require('./controllers/adminUserController'),
+  adminUsuarioController: require('./controllers/adminUsuarioController'),
   authRoutes: require('./routes/authRoutes'),
-  adminUserRoutes: require('./routes/adminUserRoutes'),
+  adminUsuarioRoutes: require('./routes/adminUsuarioRoutes'),
   adminProfileRoutes: require('./routes/adminProfileRoutes'),
-  UserModel: require('./models/userModel'),
+  UsuarioModel: require('./models/usuarioModel'),
 };
+

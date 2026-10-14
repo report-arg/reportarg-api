@@ -1,11 +1,11 @@
 const ClaimModel = require('../models/reclamoModel');
 const HistorialModel = require('../models/historialModel');
 const ActualizacionModel = require('../models/actualizacionModel');
-const NotificationService = require('../../notificaciones/notificationService');
-const { resolverInstitucionAsignada } = require('./assignmentService');
-const InstitutionModel = require('../../instituciones/institutionModel');
-const cityService = require('../../../services/cityService');
-const CategoryModel = require('../../categorias/categoryModel');
+const NotificationService = require('../../notificaciones/notificacionService');
+const { resolverInstitucionAsignada } = require('./asignacionService');
+const InstitutionModel = require('../../instituciones/institucionModel');
+const cityService = require('../../../services/ciudadService');
+const CategoryModel = require('../../categorias/categoriaModel');
 const { CATEGORY_TYPES, HISTORIAL_EVENTS, CLAIM_STATUSES } = require('../../../constants/publication');
 const { ROLES } = require('../../../constants/roles');
 const { BUSINESS_RULES } = require('../../../constants/businessRules');
@@ -16,7 +16,7 @@ function throwError(status, message) {
   throw err;
 }
 
-const claimWorkflowService = {
+const reclamoWorkflowService = {
   async crearReclamo({
     titulo, descripcion, id_categoria, direccion, latitud, longitud,
     visibilidad, imagen, id_usuario, id_ciudad, role
@@ -317,4 +317,4 @@ const claimWorkflowService = {
   }
 };
 
-module.exports = claimWorkflowService;
+module.exports = reclamoWorkflowService;

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('./notificationController');
+const ctrl = require('./notificacionController');
 
 // Obtener notificaciones del usuario autenticado
 router.get('/', ctrl.listar);

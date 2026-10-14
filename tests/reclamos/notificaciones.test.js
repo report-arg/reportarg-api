@@ -2,9 +2,9 @@ const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/config/db');
 const { generateTestToken, ROLES } = require('../helpers/auth');
-const NotificationService = require('../../src/modules/notificaciones/notificationService');
-const { NOTIFICATION_TYPES } = require('../../src/modules/notificaciones/notifications.constants');
-const NotificationModel = require('../../src/modules/notificaciones/notificationModel');
+const NotificationService = require('../../src/modules/notificaciones/notificacionService');
+const { NOTIFICATION_TYPES } = require('../../src/modules/notificaciones/notificaciones.constants');
+const NotificationModel = require('../../src/modules/notificaciones/notificacionModel');
 
 // Mock del emailService para evitar envíos reales
 jest.mock('../../src/config/emailService', () => ({

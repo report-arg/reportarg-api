@@ -1,4 +1,4 @@
-const cityService = require('../../services/cityService');
+const cityService = require('../../services/ciudadService');
 
 const cityController = {
   async listar(req, res, next) {

@@ -1,4 +1,4 @@
-const CategoryModel = require('../categorias/categoryModel');
+const CategoryModel = require('../categorias/categoriaModel');
 const ComunicadoModel = require('./comunicadoModel');
 const db = require('../../config/db');
 const {

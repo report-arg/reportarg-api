@@ -18,9 +18,9 @@ const request = require('supertest');
 const app = require('../../src/app');
 const db = require('../../src/config/db');
 const { generateTestToken, ROLES } = require('../helpers/auth');
-const cityService = require('../../src/services/cityService');
-const { resolverInstitucionAsignada } = require('../../src/modules/reclamos/services/assignmentService');
-const InstitutionModel = require('../../src/modules/instituciones/institutionModel');
+const cityService = require('../../src/services/ciudadService');
+const { resolverInstitucionAsignada } = require('../../src/modules/reclamos/services/asignacionService');
+const InstitutionModel = require('../../src/modules/instituciones/institucionModel');
 
 describe('Pruebas de Aislamiento Territorial y Reglas de Negocio', () => {
 

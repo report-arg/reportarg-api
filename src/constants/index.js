@@ -1,5 +1,5 @@
 module.exports = {
-  ...require('../modules/notificaciones/notifications.constants'),
+  ...require('../modules/notificaciones/notificaciones.constants'),
   ...require('./publication'),
   ...require('./roles'),
 };
