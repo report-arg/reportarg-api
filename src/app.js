@@ -70,6 +70,9 @@ app.use('/api/actividad', actividadRoutes);
 const institucionReclamoRoutes = require('./modules/reclamos/routes/institucionReclamoRoutes');
 app.use('/api/institucion/reclamos', institucionReclamoRoutes);
 
+const informeRoutes = require('./modules/informes/routes/informeRoutes');
+app.use('/api/institucion/informes', informeRoutes);
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
