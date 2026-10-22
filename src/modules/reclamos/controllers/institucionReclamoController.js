@@ -9,8 +9,8 @@ const institucionReclamoController = {
   async bandeja(req, res, next) {
     try {
       const idInstitucion = req.user.id_institucion;
-      const { estado, categoria, orderBy } = filtrosReclamo(req.query);
-      const data = await ClaimModel.getBandejaInstitucion(idInstitucion, estado, categoria, orderBy, req.user.id_ciudad);
+      const { estado, categoria, orderBy, fechaDesde, fechaHasta } = filtrosReclamo(req.query);
+      const data = await ClaimModel.getBandejaInstitucion(idInstitucion, estado, categoria, orderBy, req.user.id_ciudad, { fechaDesde, fechaHasta });
       res.json({ ok: true, data });
     } catch (err) {
       next(err);
