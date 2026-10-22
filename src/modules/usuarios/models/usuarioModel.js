@@ -131,11 +131,16 @@ const UserModel = {
         ) AS nombre,
         c.nombre AS nombre_ciudadano,
         c.apellido,
+        COALESCE(c.provincia, i.provincia) AS provincia,
+        COALESCE(c.ciudad, i.ciudad) AS ciudad,
+        COALESCE(c.zona, i.zona) AS zona,
         c.provincia AS provincia_declarada,
         c.ciudad AS ciudad_declarada,
         ciud.nombre AS ciudad_activa,
         ciud.provincia AS provincia_activa,
-        c.zona,
+        i.telefono,
+        i.direccion,
+        i.tipo,
         COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
         (SELECT COUNT(*) FROM reclamos r WHERE r.id_usuario = u.id_usuario) AS reportes
       FROM usuarios u
@@ -148,20 +153,32 @@ const UserModel = {
   },
 
   // Actualizar perfil propio
-  async updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto }) {
+  async updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto, telefono, direccion, tipo }) {
     if (email) {
       await db.query('UPDATE usuarios SET email = ? WHERE id_usuario = ?', [email, id]);
     }
+    const [[user]] = await db.query('SELECT tipo_usuario FROM usuarios WHERE id_usuario = ?', [id]);
+    if (!user) throw new Error('Usuario no encontrado');
+
+    if (user.tipo_usuario === 'institucion') {
+      await db.query(`
+        UPDATE instituciones
+        SET nombre = COALESCE(?, nombre), tipo = COALESCE(?, tipo), telefono = COALESCE(?, telefono),
+            provincia = COALESCE(?, provincia), ciudad = COALESCE(?, ciudad), zona = COALESCE(?, zona),
+            direccion = COALESCE(?, direccion), foto_perfil = COALESCE(?, foto_perfil)
+        WHERE id_usuario = ?
+      `, [nombre || null, tipo || null, telefono || null, provincia || null, ciudad || null, zona || null, direccion || null, foto || null, id]);
+      return;
+    }
+
     await db.query(`
-      UPDATE ciudadanos
-      SET nombre    = COALESCE(?, nombre),
-          apellido  = COALESCE(?, apellido),
-          provincia = COALESCE(?, provincia),
-          ciudad    = COALESCE(?, ciudad),
-          zona      = COALESCE(?, zona),
-          foto_perfil = COALESCE(?, foto_perfil)
-      WHERE id_usuario = ?
-    `, [nombre || null, apellido || null, provincia || null, ciudad || null, zona || null, foto || null, id]);
+      INSERT INTO ciudadanos (id_usuario, nombre, apellido, provincia, ciudad, zona, foto_perfil)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        nombre = COALESCE(VALUES(nombre), nombre), apellido = COALESCE(VALUES(apellido), apellido),
+        provincia = COALESCE(VALUES(provincia), provincia), ciudad = COALESCE(VALUES(ciudad), ciudad),
+        zona = COALESCE(VALUES(zona), zona), foto_perfil = COALESCE(VALUES(foto_perfil), foto_perfil)
+    `, [id, nombre || null, apellido || null, provincia || null, ciudad || null, zona || null, foto || null]);
   },
 
   // Cambiar contraseña verificando la actual

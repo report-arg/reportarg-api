@@ -2,8 +2,11 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { verifyToken } = require('../../../middlewares/authMiddleware');
+const profileController = require('../controllers/adminUsuarioController');
 
 router.get('/me', verifyToken, authController.me);
+router.patch('/me/perfil', verifyToken, profileController.actualizarPerfil);
+router.post('/me/cambiar-password', verifyToken, profileController.cambiarPassword);
 
 router.post('/register-citizen', authController.registerCitizen);
 router.post('/register-institution', authController.registerInstitution);

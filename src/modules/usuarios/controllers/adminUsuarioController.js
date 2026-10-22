@@ -288,7 +288,7 @@ const userController = {
 
   async actualizarPerfil(req, res, next) {
     try {
-      const { nombre, apellido, email, provincia, ciudad, zona, foto } = req.body;
+      const { nombre, apellido, email, provincia, ciudad, zona, foto, telefono, direccion, tipo } = req.body;
       const id = req.params.id || req.user.id;
 
       if (email) {
@@ -296,7 +296,7 @@ const userController = {
         if (existe) return res.status(409).json({ ok: false, mensaje: 'El email ya está en uso' });
       }
 
-      await UserModel.updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto });
+      await UserModel.updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto, telefono, direccion, tipo });
       res.json({ ok: true, mensaje: 'Perfil actualizado correctamente' });
     } catch (err) {
       next(err);
