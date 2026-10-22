@@ -293,7 +293,7 @@ const ClaimModel = {
   /**
    * Obtiene la bandeja de entrada para una institución (HU-09)
    */
-  async getBandejaInstitucion(idInstitucion, estado = null, idCategoria = null, orderBy = 'recientes', idCiudad = null) {
+  async getBandejaInstitucion(idInstitucion, estado = null, idCategoria = null, orderBy = 'recientes', idCiudad = null, { fechaDesde = null, fechaHasta = null } = {}) {
     if (!idInstitucion) return [];
     let query = `
       SELECT
@@ -321,6 +321,16 @@ const ClaimModel = {
     if (idCategoria && idCategoria !== 'Todas') {
       query += ` AND r.id_categoria = ?`;
       params.push(idCategoria);
+    }
+
+    if (fechaDesde && !Number.isNaN(new Date(fechaDesde).getTime())) {
+      query += ` AND r.fecha_creacion >= ?`;
+      params.push(fechaDesde);
+    }
+
+    if (fechaHasta && !Number.isNaN(new Date(fechaHasta).getTime())) {
+      query += ` AND r.fecha_creacion < DATE_ADD(?, INTERVAL 1 DAY)`;
+      params.push(fechaHasta);
     }
 
     if (orderBy === 'impacto') {

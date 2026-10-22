@@ -75,6 +75,19 @@ function distribution(items, key, fallback) {
   return [...counts.entries()].map(([nombre, cantidad]) => ({ nombre, cantidad })).sort((a, b) => b.cantidad - a.cantidad || a.nombre.localeCompare(b.nombre));
 }
 
+function categoryDistribution(items) {
+  const categories = new Map();
+  items.forEach((item) => {
+    const id = item.categoriaId || null;
+    const nombre = item.categoriaNombre || 'Sin categoría';
+    const key = `${id || 'none'}-${nombre}`;
+    const current = categories.get(key) || { id, nombre, cantidad: 0 };
+    current.cantidad += 1;
+    categories.set(key, current);
+  });
+  return [...categories.values()].sort((a, b) => b.cantidad - a.cantidad || a.nombre.localeCompare(b.nombre));
+}
+
 function dailySeries(items) {
   const values = new Map();
   items.forEach((item) => {
@@ -107,7 +120,7 @@ function calculateReport(reclamos, periodo, now = Date.now()) {
       demorados: conSeguimiento.filter((reclamo) => reclamo.demorado).length,
     },
     porEstado: distribution(conSeguimiento, 'estado', 'Sin estado'),
-    porCategoria: distribution(conSeguimiento, 'categoriaNombre', 'Sin categoría'),
+    porCategoria: categoryDistribution(conSeguimiento),
     porDia: dailySeries(conSeguimiento),
     mayorImpacto: [...conSeguimiento]
       .sort((a, b) => Number(b.afectadosCount || 0) - Number(a.afectadosCount || 0) || new Date(b.fecha_creacion) - new Date(a.fecha_creacion))

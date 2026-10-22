@@ -88,4 +88,15 @@ describe('HU-10: Servicio de Filtros de Reclamos (claimFilterService)', () => {
     expect(result.orderBy).toBe('recientes');
   });
 
+  test('Periodo de informes se interpreta en la zona horaria de Argentina', () => {
+    const result = filtrosReclamo({ fechaDesde: '2026-10-01', fechaHasta: '2026-10-31' });
+    expect(result.fechaDesde.toISOString()).toBe('2026-10-01T03:00:00.000Z');
+    expect(result.fechaHasta.toISOString()).toBe('2026-10-31T03:00:00.000Z');
+  });
+
+  test('Periodo de informes invalido o invertido lanza error', () => {
+    expect(() => filtrosReclamo({ fechaDesde: '2026-10-32' })).toThrow();
+    expect(() => filtrosReclamo({ fechaDesde: '2026-10-31', fechaHasta: '2026-10-01' })).toThrow();
+  });
+
 });
