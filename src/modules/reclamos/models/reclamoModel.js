@@ -304,6 +304,8 @@ const ClaimModel = {
         r.fecha_creacion,
         r.fecha_ultimo_cambio_estado,
         r.direccion,
+        c.id_categoria AS categoriaId,
+        c.codigo AS categoriaCodigo,
         c.nombre AS categoriaNombre,
         (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount
       FROM reclamos r
