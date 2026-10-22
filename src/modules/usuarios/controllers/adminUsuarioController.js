@@ -1,6 +1,37 @@
 const UserModel = require('../models/usuarioModel');
 const { ROLES } = require('../../../constants/roles');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PERSON_NAME_REGEX = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]+$/;
+
+function limpiarTexto(valor) {
+  return typeof valor === 'string' ? valor.trim().replace(/\s{2,}/g, ' ') : valor;
+}
+
+function validarPerfil(datos, esInstitucion) {
+  const { nombre, apellido, email, provincia, ciudad, zona, telefono, direccion, tipo } = datos;
+  const dentroDeRango = (valor, minimo, maximo) => typeof valor === 'string' && valor.length >= minimo && valor.length <= maximo;
+
+  if (!dentroDeRango(nombre, 2, 100)) return 'El nombre debe tener entre 2 y 100 caracteres';
+  if (!esInstitucion && !PERSON_NAME_REGEX.test(nombre)) return 'El nombre contiene caracteres no válidos';
+  if (!esInstitucion && (!dentroDeRango(apellido, 2, 100) || !PERSON_NAME_REGEX.test(apellido))) {
+    return 'El apellido debe tener entre 2 y 100 caracteres y solo contener letras, espacios, apóstrofes o guiones';
+  }
+  if (!EMAIL_REGEX.test(email || '')) return 'Email inválido';
+
+  for (const [valor, etiqueta] of [[provincia, 'La provincia'], [ciudad, 'La ciudad'], [zona, 'La zona o barrio']]) {
+    if (!dentroDeRango(valor, 2, 100)) return `${etiqueta} debe tener entre 2 y 100 caracteres`;
+  }
+
+  if (esInstitucion) {
+    if (!dentroDeRango(tipo, 2, 100)) return 'El tipo de institución debe tener entre 2 y 100 caracteres';
+    if (!/^[0-9+() -]{7,25}$/.test(telefono || '')) return 'Teléfono inválido';
+    if (!dentroDeRango(direccion, 5, 160)) return 'La dirección debe tener entre 5 y 160 caracteres';
+  }
+
+  return null;
+}
+
 const userController = {
 
   async listar(req, res, next) {
@@ -291,12 +322,30 @@ const userController = {
       const { nombre, apellido, email, provincia, ciudad, zona, foto, telefono, direccion, tipo } = req.body;
       const id = req.params.id || req.user.id;
 
-      if (email) {
-        const existe = await UserModel.emailExiste(email, id);
+      const usuarioActual = await UserModel.getById(id);
+      if (!usuarioActual) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+
+      const datosPerfil = {
+        nombre: limpiarTexto(nombre),
+        apellido: limpiarTexto(apellido),
+        email: limpiarTexto(email),
+        provincia: limpiarTexto(provincia),
+        ciudad: limpiarTexto(ciudad),
+        zona: limpiarTexto(zona),
+        telefono: limpiarTexto(telefono),
+        direccion: limpiarTexto(direccion),
+        tipo: limpiarTexto(tipo),
+        foto,
+      };
+      const errorValidacion = validarPerfil(datosPerfil, usuarioActual.rol === ROLES.INSTITUCION);
+      if (errorValidacion) return res.status(400).json({ ok: false, mensaje: errorValidacion });
+
+      if (datosPerfil.email) {
+        const existe = await UserModel.emailExiste(datosPerfil.email, id);
         if (existe) return res.status(409).json({ ok: false, mensaje: 'El email ya está en uso' });
       }
 
-      await UserModel.updatePerfil(id, { nombre, apellido, email, provincia, ciudad, zona, foto, telefono, direccion, tipo });
+      await UserModel.updatePerfil(id, datosPerfil);
       res.json({ ok: true, mensaje: 'Perfil actualizado correctamente' });
     } catch (err) {
       next(err);
