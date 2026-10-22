@@ -291,11 +291,81 @@ const ClaimModel = {
   },
 
   /**
-   * Obtiene la bandeja de entrada para una institución (HU-09)
+   * Obtiene la bandeja de entrada para una institución (HU-09, LIS-01, LIS-02)
    */
-  async getBandejaInstitucion(idInstitucion, estado = null, idCategoria = null, orderBy = 'recientes', idCiudad = null, { fechaDesde = null, fechaHasta = null } = {}) {
-    if (!idInstitucion) return [];
-    let query = `
+  async getBandejaInstitucion(
+    idInstitucion,
+    estado = null,
+    idCategoria = null,
+    orderBy = 'recientes',
+    idCiudad = null,
+    {
+      busqueda = null,
+      visibilidad = null,
+      fechaDesde = null,
+      fechaHasta = null,
+      demorado = false,
+      pagina = 1,
+      limite = 20,
+    } = {}
+  ) {
+    if (!idInstitucion) return { total: 0, rows: [] };
+    let where = `WHERE r.id_institucion = ?`;
+    const params = [idInstitucion];
+    if (idCiudad) {
+      where += ` AND r.id_ciudad = ?`;
+      params.push(idCiudad);
+    }
+
+    if (estado && estado !== 'Todos') {
+      where += ` AND r.estado = ?`;
+      params.push(estado);
+    }
+
+    if (idCategoria && idCategoria !== 'Todas') {
+      where += ` AND r.id_categoria = ?`;
+      params.push(idCategoria);
+    }
+
+    if (visibilidad && ['publico', 'privado'].includes(visibilidad)) {
+      where += ` AND r.visibilidad = ?`;
+      params.push(visibilidad);
+    }
+
+    if (busqueda && String(busqueda).trim()) {
+      const raw = String(busqueda).trim();
+      const term = `%${raw}%`;
+      const cleanedDigits = raw.replace(/^#/, '');
+      if (/^\d+$/.test(cleanedDigits)) {
+        where += ` AND (r.id_reclamo = ? OR r.titulo LIKE ? OR r.direccion LIKE ?)`;
+        params.push(Number(cleanedDigits), term, term);
+      } else {
+        where += ` AND (r.titulo LIKE ? OR r.direccion LIKE ?)`;
+        params.push(term, term);
+      }
+    }
+
+    if (fechaDesde && !Number.isNaN(new Date(fechaDesde).getTime())) {
+      where += ` AND r.fecha_creacion >= ?`;
+      params.push(fechaDesde);
+    }
+
+    if (fechaHasta && !Number.isNaN(new Date(fechaHasta).getTime())) {
+      where += ` AND r.fecha_creacion < DATE_ADD(?, INTERVAL 1 DAY)`;
+      params.push(fechaHasta);
+    }
+
+    if (demorado) {
+      const umbralDemora = new Date(Date.now() - 5 * 86400000);
+      where += ` AND r.estado = ? AND COALESCE(r.fecha_ultimo_cambio_estado, r.fecha_creacion) <= ?`;
+      params.push(CLAIM_STATUSES.PENDIENTE, umbralDemora);
+    }
+
+    const parsedPagina = Math.max(1, parseInt(pagina, 10) || 1);
+    const parsedLimite = Math.min(100, Math.max(1, parseInt(limite, 10) || 20));
+    const offset = (parsedPagina - 1) * parsedLimite;
+
+    const baseSelect = `
       SELECT
         r.id_reclamo AS id,
         r.titulo,
@@ -310,42 +380,38 @@ const ClaimModel = {
         (SELECT COUNT(*) FROM reclamos_afectados ra WHERE ra.id_reclamo = r.id_reclamo) AS afectadosCount
       FROM reclamos r
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
-      WHERE r.id_institucion = ?
+      ${where}
     `;
-    const params = [idInstitucion];
-    if (idCiudad) { query += ` AND r.id_ciudad = ?`; params.push(idCiudad); }
 
-    if (estado && estado !== 'Todos') {
-      query += ` AND r.estado = ?`;
-      params.push(estado);
-    }
-    
-    if (idCategoria && idCategoria !== 'Todas') {
-      query += ` AND r.id_categoria = ?`;
-      params.push(idCategoria);
+    // Ordenamiento legacy 'atencion' en memoria por compatibilidad con el Inicio Institucional
+    if (orderBy === 'atencion') {
+      const [rows] = await db.query(baseSelect, params);
+      const data = rows.map(r => seguimiento(r)).sort(compararAtencion);
+      return {
+        total: data.length,
+        rows: data.slice(offset, offset + parsedLimite),
+      };
     }
 
-    if (fechaDesde && !Number.isNaN(new Date(fechaDesde).getTime())) {
-      query += ` AND r.fecha_creacion >= ?`;
-      params.push(fechaDesde);
-    }
+    const [[countRow]] = await db.query(
+      `SELECT COUNT(*) AS total FROM reclamos r ${where}`,
+      params
+    );
+    const total = Number(countRow?.total || 0);
 
-    if (fechaHasta && !Number.isNaN(new Date(fechaHasta).getTime())) {
-      query += ` AND r.fecha_creacion < DATE_ADD(?, INTERVAL 1 DAY)`;
-      params.push(fechaHasta);
-    }
-
+    let orderClause = `ORDER BY r.fecha_creacion DESC, r.id_reclamo DESC`;
     if (orderBy === 'impacto') {
-      query += ` ORDER BY afectadosCount DESC, r.fecha_ultimo_cambio_estado DESC`;
+      orderClause = `ORDER BY afectadosCount DESC, r.fecha_creacion DESC, r.id_reclamo DESC`;
     } else if (orderBy === 'antiguos') {
-      query += ` ORDER BY COALESCE(r.fecha_ultimo_cambio_estado, r.fecha_creacion) ASC, r.id_reclamo ASC`;
-    } else {
-      query += ` ORDER BY r.fecha_ultimo_cambio_estado DESC`;
+      orderClause = `ORDER BY r.fecha_creacion ASC, r.id_reclamo ASC`;
     }
 
-    const [rows] = await db.query(query, params);
+    const [rows] = await db.query(
+      `${baseSelect} ${orderClause} LIMIT ? OFFSET ?`,
+      [...params, parsedLimite, offset]
+    );
     const data = rows.map(r => seguimiento(r));
-    return orderBy === 'atencion' ? data.sort(compararAtencion) : data;
+    return { total, rows: data };
   },
 
   /**
