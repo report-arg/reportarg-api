@@ -176,6 +176,27 @@
             }
           },
           {
+            "name": "busqueda",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoria",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ciudad",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "pagina",
             "in": "query",
             "schema": {
@@ -306,10 +327,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "motivo": {
+                  "id_institucion": {
                     "example": "any"
                   },
-                  "id_institucion": {
+                  "motivo": {
                     "example": "any"
                   }
                 }
@@ -382,6 +403,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "tags": [
@@ -718,6 +742,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "tags": [
@@ -920,6 +947,30 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "General"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/institucion/informes/gestion-reclamos": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "tags": [

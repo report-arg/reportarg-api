@@ -6,7 +6,7 @@
  * Tests unitarios sin dependencias de base de datos.
  */
 
-const { filtrosReclamo } = require('../../src/modules/reclamos/services/claimFilterService');
+const { filtrosReclamo } = require('../../src/modules/reclamos/services/reclamoFilterService');
 const { CLAIM_STATUSES } = require('../../src/constants/publication');
 
 describe('HU-10: Servicio de Filtros de Reclamos (claimFilterService)', () => {
@@ -86,6 +86,47 @@ describe('HU-10: Servicio de Filtros de Reclamos (claimFilterService)', () => {
     expect(result.estado).toBeNull();
     expect(result.categoria).toBeNull();
     expect(result.orderBy).toBe('recientes');
+  });
+
+  test('Periodo de informes se interpreta en la zona horaria de Argentina', () => {
+    const result = filtrosReclamo({ fechaDesde: '2026-10-01', fechaHasta: '2026-10-31' });
+    expect(result.fechaDesde.toISOString()).toBe('2026-10-01T03:00:00.000Z');
+    expect(result.fechaHasta.toISOString()).toBe('2026-10-31T03:00:00.000Z');
+  });
+
+  test('Periodo de informes invalido o invertido lanza error', () => {
+    expect(() => filtrosReclamo({ fechaDesde: '2026-10-32' })).toThrow();
+    expect(() => filtrosReclamo({ fechaDesde: '2026-10-31', fechaHasta: '2026-10-01' })).toThrow();
+  });
+
+  test('LIS-02: soporta busqueda, visibilidad, demorado, pagina y limite por defecto 20', () => {
+    const result = filtrosReclamo({
+      busqueda: '  Av. San Martín  ',
+      visibilidad: 'privado',
+      demorado: 'true',
+      pagina: '2',
+      limite: '15',
+    });
+    expect(result.busqueda).toBe('Av. San Martín');
+    expect(result.visibilidad).toBe('privado');
+    expect(result.demorado).toBe(true);
+    expect(result.pagina).toBe(2);
+    expect(result.limite).toBe(15);
+
+    const def = filtrosReclamo({});
+    expect(def.pagina).toBe(1);
+    expect(def.limite).toBe(20);
+    expect(def.demorado).toBe(false);
+    expect(def.visibilidad).toBeNull();
+  });
+
+  test('LIS-02: visibilidad, demorado, pagina o limite inválidos lanzan error 400', () => {
+    expect(() => filtrosReclamo({ visibilidad: 'secreto' })).toThrow();
+    expect(() => filtrosReclamo({ demorado: 'talvez' })).toThrow();
+    expect(() => filtrosReclamo({ pagina: '0' })).toThrow();
+    expect(() => filtrosReclamo({ pagina: 'abc' })).toThrow();
+    expect(() => filtrosReclamo({ limite: '0' })).toThrow();
+    expect(() => filtrosReclamo({ limite: '250' })).toThrow();
   });
 
 });

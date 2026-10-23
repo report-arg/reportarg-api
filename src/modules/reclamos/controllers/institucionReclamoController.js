@@ -1,7 +1,7 @@
-const { filtrosReclamo } = require('../services/claimFilterService');
+const { filtrosReclamo } = require('../services/reclamoFilterService');
 const ClaimModel = require('../models/reclamoModel');
 const HistorialModel = require('../models/historialModel');
-const NotificationService = require('../../notificaciones/notificationService');
+const NotificationService = require('../../notificaciones/notificacionService');
 const { CLAIM_STATUSES, HISTORIAL_EVENTS } = require('../../../constants/publication');
 
 const institucionReclamoController = {
@@ -9,8 +9,26 @@ const institucionReclamoController = {
   async bandeja(req, res, next) {
     try {
       const idInstitucion = req.user.id_institucion;
-      const { estado, categoria, orderBy } = filtrosReclamo(req.query);
-      const data = await ClaimModel.getBandejaInstitucion(idInstitucion, estado, categoria, orderBy, req.user.id_ciudad);
+      const {
+        estado,
+        categoria,
+        orderBy,
+        busqueda,
+        visibilidad,
+        fechaDesde,
+        fechaHasta,
+        demorado,
+        pagina,
+        limite,
+      } = filtrosReclamo(req.query);
+      const data = await ClaimModel.getBandejaInstitucion(
+        idInstitucion,
+        estado,
+        categoria,
+        orderBy,
+        req.user.id_ciudad,
+        { busqueda, visibilidad, fechaDesde, fechaHasta, demorado, pagina, limite }
+      );
       res.json({ ok: true, data });
     } catch (err) {
       next(err);

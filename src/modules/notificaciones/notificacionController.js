@@ -1,4 +1,4 @@
-const NotificationModel = require('./notificationModel');
+const NotificationModel = require('./notificacionModel');
 
 const notificationController = {
   /**

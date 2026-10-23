@@ -20,36 +20,38 @@ setupSwagger(app);
 
 const {
   authRoutes,
-  adminUserRoutes,
+  adminUsuarioRoutes,
   adminProfileRoutes,
 } = require('./modules/usuarios');
 
 app.use('/api/auth', authRoutes);
 
-const { uploadRoutes, searchRoutes } = require('./modules/admin');
+const { uploadRoutes, searchRoutes, ciudadRoutes } = require('./modules/admin');
 
 app.use('/api/admin/usuarios/me', verifyToken, adminProfileRoutes);
 app.use('/api/admin/upload', verifyToken, uploadRoutes);
 
-const { notificationRoutes } = require('./modules/notificaciones');
-app.use('/api/notificaciones', verifyToken, notificationRoutes);
+const { notificacionRoutes } = require('./modules/notificaciones');
+app.use('/api/notificaciones', verifyToken, notificacionRoutes);
 
 app.use('/api/admin', verifyToken, requireAdmin);
 
-app.use('/api/admin/usuarios', adminUserRoutes);
+app.use('/api/admin/usuarios', adminUsuarioRoutes);
 
-const { categoryRoutes } = require('./modules/categorias');
-app.use('/api/admin/categorias', categoryRoutes);
+const { categoriaRoutes } = require('./modules/categorias');
+app.use('/api/admin/categorias', categoriaRoutes);
 
-const { institutionRoutes } = require('./modules/instituciones');
-app.use('/api/admin/instituciones', institutionRoutes);
+const { institucionRoutes } = require('./modules/instituciones');
+app.use('/api/admin/instituciones', institucionRoutes);
 
 const adminReclamoRoutes = require('./modules/reclamos/routes/adminReclamoRoutes');
 app.use('/api/admin/reclamos', adminReclamoRoutes);
 
+app.use('/api/admin/ciudades', ciudadRoutes);
+
 app.use('/api/admin/buscar', searchRoutes);
 
-app.use('/api/admin/notificaciones', notificationRoutes);
+app.use('/api/admin/notificaciones', notificacionRoutes);
 
 const { feedRoutes, actividadRoutes } = require('./modules/feed');
 app.use('/api/feed', feedRoutes);
@@ -67,6 +69,9 @@ app.use('/api/actividad', actividadRoutes);
 
 const institucionReclamoRoutes = require('./modules/reclamos/routes/institucionReclamoRoutes');
 app.use('/api/institucion/reclamos', institucionReclamoRoutes);
+
+const informeRoutes = require('./modules/informes/routes/informeRoutes');
+app.use('/api/institucion/informes', informeRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

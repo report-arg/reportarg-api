@@ -1,7 +1,8 @@
 module.exports = {
-  notificationController: require('./notificationController'),
-  notificationRoutes: require('./notificationRoutes'),
-  NotificationModel: require('./notificationModel'),
-  NotificationService: require('./notificationService'),
-  constants: require('./notifications.constants'),
+  notificacionController: require('./notificacionController'),
+  notificacionRoutes: require('./notificacionRoutes'),
+  NotificacionModel: require('./notificacionModel'),
+  NotificacionService: require('./notificacionService'),
+  constants: require('./notificaciones.constants'),
 };
+

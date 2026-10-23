@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const ctrl    = require('./institutionController');
+const ctrl    = require('./institucionController');
 
 router.get('/',              ctrl.listar);
 router.get('/stats',         ctrl.stats);
