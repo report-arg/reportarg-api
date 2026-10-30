@@ -8,6 +8,7 @@ const CiudadanoModel = require('../models/ciudadanoModel');
 const InstitutionModel = require('../../instituciones/institucionModel');
 const db = require('../../../config/db'); // Solo para connection.beginTransaction
 const { ROLES, normalizeRole, getCanonicalRole } = require('../../../constants/roles');
+const { BUSINESS_RULES } = require('../../../constants/businessRules');
 
 const OTP_EXPIRATION_MINUTES = 15;
 const REFRESH_TOKEN_EXPIRATION_DAYS = 7;
@@ -209,6 +210,17 @@ const authService = {
     const existingUser = await this.findUserByEmail(email);
     if (existingUser) throwError(400, 'El email ya está registrado');
 
+    const nombreClean = String(nombre || '').trim();
+    const apellidoClean = String(apellido || '').trim();
+    const emailClean = String(email || '').trim();
+    const provinciaClean = String(provincia || '').trim();
+    const ciudadClean = String(ciudad || '').trim();
+    const zonaClean = String(zona || '').trim();
+
+    if (!nombreClean || !apellidoClean || !emailClean || !password || !provinciaClean || !ciudadClean || !zonaClean) {
+      throwError(400, 'Todos los datos obligatorios de registro y residencia son requeridos');
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const otp = generateOTP();
     const expiresAt = getOtpExpirationDate();
@@ -217,31 +229,54 @@ const authService = {
     await connection.beginTransaction();
 
     try {
-      const idCiudadActiva = await cityService.findActiveCity(ciudad, provincia, connection);
+      const idCiudadActiva = await cityService.findActiveCity(ciudadClean, provinciaClean, connection);
+
+      if (!idCiudadActiva) {
+        const existeEnPadron = await cityService.existsCity(ciudadClean, provinciaClean, connection);
+        if (!existeEnPadron) {
+          throwError(
+            400,
+            'La ciudad seleccionada no existe o no es válida para la provincia indicada.',
+            'CIUDAD_INEXISTENTE'
+          );
+        }
+      }
 
       const userId = await UserModel.createAuthUser(connection, {
-        email,
+        email: emailClean,
         password: hashedPassword,
         email_verified: false,
         verification_code: otp,
         verification_expires: expiresAt,
         auth_provider: 'local',
         activo: true,
-        id_ciudad: idCiudadActiva,
+        id_ciudad: idCiudadActiva || null,
         tipo_usuario: ROLES.CIUDADANO
       });
 
       await CiudadanoModel.create(connection, {
         id_usuario: userId,
-        nombre,
-        apellido,
-        provincia,
-        ciudad,
-        zona
+        nombre: nombreClean,
+        apellido: apellidoClean,
+        provincia: provinciaClean,
+        ciudad: ciudadClean,
+        zona: zonaClean
       });
 
       await connection.commit();
-      await emailService.enviarCodigoVerificacion(email, otp);
+      await emailService.enviarCodigoVerificacion(emailClean, otp);
+
+      return {
+        id_usuario: userId,
+        id_ciudad: idCiudadActiva || null,
+        ciudad_activa: Boolean(idCiudadActiva),
+        ciudad_residencia: {
+          id: idCiudadActiva || null,
+          nombre: ciudadClean,
+          provincia: provinciaClean,
+          activa: Boolean(idCiudadActiva),
+        },
+      };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -556,6 +591,133 @@ const authService = {
     if (token) {
       await RefreshTokenModel.deleteByToken(token);
     }
+  },
+
+  async getCiudadesInteres(userId, role) {
+    if (normalizeRole(role) !== ROLES.CIUDADANO) {
+      throwError(403, 'La gestión de ciudades de interés es exclusiva para ciudadanos', 'ROL_NO_AUTORIZADO');
+    }
+
+    const lista = await CiudadanoModel.getCiudadesInteres(userId);
+    const inactivas = lista.filter((c) => !c.activa);
+
+    return {
+      ciudades: lista,
+      maximo: BUSINESS_RULES.CITIZEN_MAX_INTEREST_CITIES,
+      disponibles: Math.max(0, BUSINESS_RULES.CITIZEN_MAX_INTEREST_CITIES - lista.length),
+      hay_ciudades_inactivas: inactivas.length > 0,
+      ciudades_inactivas: inactivas,
+    };
+  },
+
+  async addCiudadInteres(userId, role, idCiudadInput, idCiudadResidencia = null) {
+    if (normalizeRole(role) !== ROLES.CIUDADANO) {
+      throwError(403, 'La gestión de ciudades de interés es exclusiva para ciudadanos', 'ROL_NO_AUTORIZADO');
+    }
+
+    const idCiudad = Number(idCiudadInput);
+    if (!idCiudad || !Number.isSafeInteger(idCiudad) || idCiudad <= 0) {
+      throwError(400, 'Debés seleccionar una ciudad válida', 'CIUDAD_INVALIDA');
+    }
+
+    if (idCiudadResidencia && Number(idCiudadResidencia) === idCiudad) {
+      throwError(400, 'No podés agregar tu propia ciudad de residencia como ciudad de interés', 'CIUDAD_ES_RESIDENCIA');
+    }
+
+    const ciudad = await cityService.getById(idCiudad);
+    if (!ciudad) {
+      throwError(400, 'La ciudad seleccionada no existe', 'CIUDAD_INEXISTENTE');
+    }
+    if (!ciudad.activa) {
+      throwError(
+        400,
+        'La ciudad seleccionada no está activa y no cumple los requisitos de disponibilidad',
+        'CIUDAD_INACTIVA'
+      );
+    }
+
+    const perfilCiudadano = await CiudadanoModel.getByUserId(userId);
+    if (
+      perfilCiudadano?.ciudad &&
+      perfilCiudadano?.provincia &&
+      String(perfilCiudadano.ciudad).trim().toLowerCase() === String(ciudad.nombre).trim().toLowerCase() &&
+      String(perfilCiudadano.provincia).trim().toLowerCase() === String(ciudad.provincia).trim().toLowerCase()
+    ) {
+      throwError(400, 'No podés agregar tu propia ciudad de residencia como ciudad de interés', 'CIUDAD_ES_RESIDENCIA');
+    }
+
+    const yaExiste = await CiudadanoModel.hasCiudadInteres(userId, idCiudad);
+    if (yaExiste) {
+      throwError(400, 'Esta ciudad ya forma parte de tus ciudades de interés', 'CIUDAD_YA_AGREGADA');
+    }
+
+    const total = await CiudadanoModel.countCiudadesInteres(userId);
+    if (total >= BUSINESS_RULES.CITIZEN_MAX_INTEREST_CITIES) {
+      throwError(
+        400,
+        `Solo podés guardar hasta ${BUSINESS_RULES.CITIZEN_MAX_INTEREST_CITIES} ciudades adicionales de interés`,
+        'LIMITE_CIUDADES_INTERES'
+      );
+    }
+
+    await CiudadanoModel.addCiudadInteres(userId, idCiudad);
+    return await this.getCiudadesInteres(userId, role);
+  },
+
+  async removeCiudadInteres(userId, role, idCiudadInput) {
+    if (normalizeRole(role) !== ROLES.CIUDADANO) {
+      throwError(403, 'La gestión de ciudades de interés es exclusiva para ciudadanos', 'ROL_NO_AUTORIZADO');
+    }
+
+    const idCiudad = Number(idCiudadInput);
+    if (!idCiudad || !Number.isSafeInteger(idCiudad) || idCiudad <= 0) {
+      throwError(400, 'ID de ciudad inválido', 'CIUDAD_INVALIDA');
+    }
+
+    const eliminadas = await CiudadanoModel.removeCiudadInteres(userId, idCiudad);
+    if (eliminadas === 0) {
+      throwError(404, 'La ciudad indicada no se encuentra en tus ciudades de interés', 'CIUDAD_NO_ENCONTRADA');
+    }
+
+    return await this.getCiudadesInteres(userId, role);
+  },
+
+  async cambiarContextoCiudad(userId, role, idCiudadInput, idCiudadResidencia = null) {
+    if (normalizeRole(role) !== ROLES.CIUDADANO) {
+      throwError(403, 'El cambio de contexto territorial es exclusivo para ciudadanos', 'ROL_NO_AUTORIZADO');
+    }
+
+    const idCiudad = Number(idCiudadInput);
+    if (!idCiudad || !Number.isSafeInteger(idCiudad) || idCiudad <= 0) {
+      throwError(400, 'Debés seleccionar una ciudad válida', 'CIUDAD_INVALIDA');
+    }
+
+    const ciudad = await cityService.getById(idCiudad);
+    if (!ciudad) {
+      throwError(404, 'La ciudad seleccionada no existe', 'CIUDAD_INEXISTENTE');
+    }
+    if (!ciudad.activa) {
+      throwError(
+        400,
+        `La ciudad ${ciudad.nombre} dejó de estar activa en ReportARG. Se bloquearon las operaciones en esta localidad.`,
+        'CIUDAD_INACTIVA'
+      );
+    }
+
+    const esResidencia = Boolean(idCiudadResidencia) && Number(idCiudadResidencia) === Number(ciudad.id);
+
+    return {
+      ciudad_seleccionada: {
+        id: ciudad.id,
+        nombre: ciudad.nombre,
+        provincia: ciudad.provincia,
+        activa: true,
+      },
+      es_residencia: esResidencia,
+      es_visitante: !esResidencia,
+      id_ciudad_residencia: idCiudadResidencia || null,
+      permisos_escritura: esResidencia,
+    };
   }
 };
 

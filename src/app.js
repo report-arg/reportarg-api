@@ -55,6 +55,7 @@ app.use('/api/admin/notificaciones', notificacionRoutes);
 
 const { feedRoutes, actividadRoutes } = require('./modules/feed');
 app.use('/api/feed', feedRoutes);
+app.use('/api/ciudades', ciudadRoutes);
 
 const reclamoRoutes = require('./modules/reclamos/routes/reclamoRoutes');
 app.use('/api/reclamos', reclamoRoutes);

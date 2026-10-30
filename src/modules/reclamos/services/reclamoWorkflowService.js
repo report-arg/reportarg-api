@@ -290,7 +290,7 @@ const reclamoWorkflowService = {
       throwError(400, 'No puedes adherirte a tu propio reclamo');
     }
 
-    if (idCiudadUsuario && reclamo.id_ciudad && Number(idCiudadUsuario) !== Number(reclamo.id_ciudad)) {
+    if (!idCiudadUsuario || (reclamo.id_ciudad && Number(idCiudadUsuario) !== Number(reclamo.id_ciudad))) {
       throwError(403, 'Solo puedes participar en reclamos de tu ciudad');
     }
 

@@ -7,6 +7,10 @@ const profileController = require('../controllers/adminUsuarioController');
 router.get('/me', verifyToken, authController.me);
 router.patch('/me/perfil', verifyToken, profileController.actualizarPerfil);
 router.post('/me/cambiar-password', verifyToken, profileController.cambiarPassword);
+router.get('/me/ciudades-interes', verifyToken, authController.getCiudadesInteres);
+router.post('/me/ciudades-interes', verifyToken, authController.addCiudadInteres);
+router.delete('/me/ciudades-interes/:idCiudad', verifyToken, authController.removeCiudadInteres);
+router.post('/me/contexto-ciudad', verifyToken, authController.cambiarContextoCiudad);
 
 router.post('/register-citizen', authController.registerCitizen);
 router.post('/register-institution', authController.registerInstitution);

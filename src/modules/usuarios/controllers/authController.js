@@ -65,11 +65,21 @@ const registerCitizen = async (req, res, next) => {
   }
 
   try {
-    await authService.registerCitizen(req.body);
-    return res.status(201).json({ message: 'Usuario registrado. Por favor verifica tu email.' });
+    const result = await authService.registerCitizen(req.body);
+    return res.status(201).json({
+      ok: true,
+      message: 'Usuario registrado. Por favor verifica tu email.',
+      ciudad_activa: result?.ciudad_activa ?? false,
+      ciudad_residencia: result?.ciudad_residencia ?? null,
+      data: result || null,
+    });
   } catch (error) {
     if (error.status) {
-      return res.status(error.status).json({ error: error.message });
+      return res.status(error.status).json({
+        ok: false,
+        error: error.message,
+        ...(error.codigo ? { codigo: error.codigo } : {}),
+      });
     }
     next(error);
   }
@@ -217,18 +227,139 @@ const logout = async (req, res, next) => {
 const me = async (req, res, next) => {
   try {
     const UserModel = require('../models/usuarioModel');
+    const CiudadanoModel = require('../models/ciudadanoModel');
     const usuario = await UserModel.getById(req.user.id);
     if (!usuario) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+
+    const residenciaActiva =
+      usuario.residencia_activa !== undefined && usuario.residencia_activa !== null
+        ? Number(usuario.residencia_activa) === 1
+        : Boolean(req.user.id_ciudad);
+
+    const nombreResidencia = usuario.ciudad_declarada || usuario.ciudad_activa || usuario.ciudad || null;
+    const provinciaResidencia = usuario.provincia_declarada || usuario.provincia_activa || usuario.provincia || null;
+
+    let ciudadesInteres = [];
+    if (req.user.role === 'ciudadano') {
+      try {
+        ciudadesInteres = await CiudadanoModel.getCiudadesInteres(req.user.id);
+      } catch (_) {
+        ciudadesInteres = [];
+      }
+    }
+
     return res.json({
       ok: true,
       data: {
         ...usuario,
         rol: req.user.role,
+        id_ciudad: residenciaActiva ? (req.user.id_ciudad ?? usuario.id_ciudad ?? null) : null,
+        residencia_activa: residenciaActiva,
+        ciudad_residencia: {
+          id: residenciaActiva ? (req.user.id_ciudad ?? usuario.id_ciudad ?? null) : null,
+          nombre: nombreResidencia,
+          provincia: provinciaResidencia,
+          activa: residenciaActiva,
+        },
+        ciudades_interes: ciudadesInteres,
         id_institucion: req.user.id_institucion ?? usuario.id_institucion ?? null,
         institucion_verificada: req.user.institucion_verificada,
       },
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+const getCiudadesInteres = async (req, res, next) => {
+  try {
+    const data = await authService.getCiudadesInteres(req.user.id, req.user.role);
+    return res.json({ ok: true, data });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        ok: false,
+        mensaje: error.message,
+        error: error.message,
+        ...(error.codigo ? { codigo: error.codigo } : {}),
+      });
+    }
+    next(error);
+  }
+};
+
+const addCiudadInteres = async (req, res, next) => {
+  try {
+    const idCiudad = req.body?.id_ciudad ?? req.body?.idCiudad;
+    const data = await authService.addCiudadInteres(
+      req.user.id,
+      req.user.role,
+      idCiudad,
+      req.user.id_ciudad
+    );
+    return res.status(201).json({
+      ok: true,
+      mensaje: 'Ciudad de interés agregada correctamente.',
+      data,
+    });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        ok: false,
+        mensaje: error.message,
+        error: error.message,
+        ...(error.codigo ? { codigo: error.codigo } : {}),
+      });
+    }
+    next(error);
+  }
+};
+
+const removeCiudadInteres = async (req, res, next) => {
+  try {
+    const { idCiudad } = req.params;
+    const data = await authService.removeCiudadInteres(req.user.id, req.user.role, idCiudad);
+    return res.json({
+      ok: true,
+      mensaje: 'Ciudad de interés eliminada correctamente.',
+      data,
+    });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        ok: false,
+        mensaje: error.message,
+        error: error.message,
+        ...(error.codigo ? { codigo: error.codigo } : {}),
+      });
+    }
+    next(error);
+  }
+};
+
+const cambiarContextoCiudad = async (req, res, next) => {
+  try {
+    const idCiudad = req.body?.id_ciudad ?? req.body?.idCiudad;
+    const data = await authService.cambiarContextoCiudad(
+      req.user.id,
+      req.user.role,
+      idCiudad,
+      req.user.id_ciudad
+    );
+    return res.json({
+      ok: true,
+      mensaje: 'Contexto de ciudad actualizado para consulta.',
+      data,
+    });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        ok: false,
+        mensaje: error.message,
+        error: error.message,
+        ...(error.codigo ? { codigo: error.codigo } : {}),
+      });
+    }
     next(error);
   }
 };
@@ -245,4 +376,8 @@ module.exports = {
   refreshToken,
   logout,
   me,
+  getCiudadesInteres,
+  addCiudadInteres,
+  removeCiudadInteres,
+  cambiarContextoCiudad,
 };

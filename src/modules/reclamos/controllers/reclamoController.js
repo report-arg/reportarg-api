@@ -53,6 +53,25 @@ const reclamoController = {
       let id_ciudad = req.user.id_ciudad;
       if (req.user.role === ROLES.ADMIN) {
         id_ciudad = req.body.id_ciudad;
+      } else if (req.user.role === ROLES.CIUDADANO) {
+        if (
+          req.body.id_ciudad !== undefined &&
+          req.body.id_ciudad !== null &&
+          Number(req.body.id_ciudad) !== Number(req.user.id_ciudad)
+        ) {
+          return res.status(403).json({
+            ok: false,
+            codigo: 'CIUDAD_VISITANTE_SIN_PERMISOS',
+            mensaje: 'No tenés permisos para crear reclamos en una ciudad distinta a tu ciudad de residencia. El cambio de ciudad solo modifica el contexto de consulta.',
+          });
+        }
+        if (!req.user.id_ciudad) {
+          return res.status(403).json({
+            ok: false,
+            codigo: 'CIUDAD_RESIDENCIA_INACTIVA',
+            mensaje: 'Tu ciudad de residencia no se encuentra activa en ReportARG. No se pueden registrar nuevos reclamos.',
+          });
+        }
       }
 
       const id = await reclamoWorkflowService.crearReclamo({
@@ -93,8 +112,26 @@ const reclamoController = {
   async reclamosPublicos(req, res, next) {
     try {
       const filtros = filtrosReclamo(req.query);
-      const id_ciudad = req.user?.id_ciudad;
+      let id_ciudad = req.user?.id_ciudad;
       const id_usuario = req.user?.id;
+
+      if (req.query.id_ciudad !== undefined && req.query.id_ciudad !== '') {
+        const queryCiudadId = Number(req.query.id_ciudad);
+        if (!Number.isSafeInteger(queryCiudadId) || queryCiudadId <= 0) {
+          return res.status(400).json({ ok: false, mensaje: 'ID de ciudad inválido.' });
+        }
+        const ciudadConsultada = await ciudadService.getActiveById(queryCiudadId);
+        if (!ciudadConsultada) {
+          return res.json({
+            ok: true,
+            data: [],
+            ciudad_inactiva: true,
+            mensaje: 'La ciudad seleccionada no se encuentra activa actualmente en ReportARG.',
+          });
+        }
+        id_ciudad = ciudadConsultada.id_ciudad || queryCiudadId;
+      }
+
       if (!id_ciudad) {
         return res.json({ ok: true, data: [] });
       }
@@ -226,7 +263,23 @@ const reclamoController = {
    */
   async reclamosParaMapa(req, res, next) {
     try {
-      const id_ciudad = req.user?.id_ciudad;
+      let id_ciudad = req.user?.id_ciudad;
+      if (req.query.id_ciudad !== undefined && req.query.id_ciudad !== '') {
+        const queryCiudadId = Number(req.query.id_ciudad);
+        if (!Number.isSafeInteger(queryCiudadId) || queryCiudadId <= 0) {
+          return res.status(400).json({ ok: false, mensaje: 'ID de ciudad inválido.' });
+        }
+        const ciudadConsultada = await ciudadService.getActiveById(queryCiudadId);
+        if (!ciudadConsultada) {
+          return res.json({
+            ok: true,
+            data: [],
+            ciudad_inactiva: true,
+            mensaje: 'La ciudad seleccionada no se encuentra activa actualmente en ReportARG.',
+          });
+        }
+        id_ciudad = ciudadConsultada.id_ciudad || queryCiudadId;
+      }
       if (!id_ciudad) {
         return res.json({ ok: true, data: [] });
       }

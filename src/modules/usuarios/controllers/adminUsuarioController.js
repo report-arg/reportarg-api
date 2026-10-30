@@ -19,11 +19,14 @@ function validarPerfil(datos, esInstitucion) {
   }
   if (!EMAIL_REGEX.test(email || '')) return 'Email inválido';
 
-  for (const [valor, etiqueta] of [[provincia, 'La provincia'], [ciudad, 'La ciudad'], [zona, 'La zona o barrio']]) {
+  for (const [valor, etiqueta] of [[zona, 'La zona o barrio']]) {
     if (!dentroDeRango(valor, 2, 100)) return `${etiqueta} debe tener entre 2 y 100 caracteres`;
   }
 
   if (esInstitucion) {
+    for (const [valor, etiqueta] of [[provincia, 'La provincia'], [ciudad, 'La ciudad']]) {
+      if (!dentroDeRango(valor, 2, 100)) return `${etiqueta} debe tener entre 2 y 100 caracteres`;
+    }
     if (!dentroDeRango(tipo, 2, 100)) return 'El tipo de institución debe tener entre 2 y 100 caracteres';
     if (!/^[0-9+() -]{7,25}$/.test(telefono || '')) return 'Teléfono inválido';
     if (!dentroDeRango(direccion, 5, 160)) return 'La dirección debe tener entre 5 y 160 caracteres';
@@ -331,19 +334,42 @@ const userController = {
       const usuarioActual = await UserModel.getById(id);
       if (!usuarioActual) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
 
+      const esInstitucion = usuarioActual.rol === ROLES.INSTITUCION;
+      const ciudadActual = usuarioActual.ciudad_declarada || usuarioActual.ciudad || null;
+      const provinciaActual = usuarioActual.provincia_declarada || usuarioActual.provincia || null;
+
+      if (!esInstitucion) {
+        const intentoCambioCiudad =
+          ciudad !== undefined &&
+          ciudadActual &&
+          limpiarTexto(ciudad).toLowerCase() !== String(ciudadActual).trim().toLowerCase();
+        const intentoCambioProvincia =
+          provincia !== undefined &&
+          provinciaActual &&
+          limpiarTexto(provincia).toLowerCase() !== String(provinciaActual).trim().toLowerCase();
+
+        if (intentoCambioCiudad || intentoCambioProvincia) {
+          return res.status(400).json({
+            ok: false,
+            codigo: 'RESIDENCIA_NO_EDITABLE',
+            mensaje: 'No está permitido modificar la ciudad ni la provincia de residencia desde el perfil.',
+          });
+        }
+      }
+
       const datosPerfil = {
         nombre: limpiarTexto(nombre),
         apellido: limpiarTexto(apellido),
         email: limpiarTexto(email),
-        provincia: limpiarTexto(provincia),
-        ciudad: limpiarTexto(ciudad),
+        provincia: esInstitucion ? limpiarTexto(provincia) : provinciaActual,
+        ciudad: esInstitucion ? limpiarTexto(ciudad) : ciudadActual,
         zona: limpiarTexto(zona),
         telefono: limpiarTexto(telefono),
         direccion: limpiarTexto(direccion),
         tipo: limpiarTexto(tipo),
         foto,
       };
-      const errorValidacion = validarPerfil(datosPerfil, usuarioActual.rol === ROLES.INSTITUCION);
+      const errorValidacion = validarPerfil(datosPerfil, esInstitucion);
       if (errorValidacion) return res.status(400).json({ ok: false, mensaje: errorValidacion });
 
       if (datosPerfil.email) {

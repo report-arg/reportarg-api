@@ -324,7 +324,18 @@ El ciudadano puede:
 - cambiar entre su ciudad de residencia y las ciudades agregadas.
 
 La ciudad de residencia no puede eliminarse como si fuera una ciudad
-agregada.
+agregada ni modificarse desde el perfil ciudadano en esta etapa (`PATCH /api/auth/me/perfil` rechaza cambios de `ciudad` o `provincia` para ciudadanos con código `RESIDENCIA_NO_EDITABLE`).
+
+### Contrato implementado (CITY-02)
+
+- **Persistencia:** Tabla `ciudadano_ciudades_interes (id_usuario, id_ciudad, fecha_creacion)` creada en la migración `011_ciudadano_ciudades_interes.sql`.
+- **Límite de negocio:** Máximo **3** ciudades adicionales de interés por ciudadano (`BUSINESS_RULES.CITIZEN_MAX_INTEREST_CITIES = 3`).
+- **Endpoints:**
+  - `GET /api/ciudades`: Lista las ciudades activas disponibles en la plataforma.
+  - `GET /api/auth/me/ciudades-interes`: Devuelve las ciudades de interés guardadas con su estado actual (`activa`, `estado`, `aviso_inactiva`, `hay_ciudades_inactivas`).
+  - `POST /api/auth/me/ciudades-interes`: Permite guardar una ciudad activa de interés distinta a la residencia, validando existencia, disponibilidad y el tope de 3 ciudades.
+  - `DELETE /api/auth/me/ciudades-interes/:idCiudad`: Elimina una ciudad de interés guardada.
+  - `POST /api/auth/me/contexto-ciudad`: Valida que la ciudad seleccionada exista y esté activa para consulta sin modificar `usuarios.id_ciudad` ni otorgar permisos de escritura.
 
 ---
 

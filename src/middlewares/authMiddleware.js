@@ -13,8 +13,9 @@ const getUserFromToken = async (req) => {
     if (!decoded?.id) return null;
 
     const [rows] = await db.query(
-      `SELECT u.id_usuario, u.email, u.activo, u.tipo_usuario, u.id_ciudad, i.id_institucion, i.verificada AS institucion_verificada
+      `SELECT u.id_usuario, u.email, u.activo, u.tipo_usuario, u.id_ciudad, c.activa AS ciudad_activa, i.id_institucion, i.verificada AS institucion_verificada
        FROM usuarios u
+       LEFT JOIN ciudades c ON c.id_ciudad = u.id_ciudad
        LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
        WHERE u.id_usuario = ?`,
       [decoded.id]
@@ -45,11 +46,19 @@ const getUserFromToken = async (req) => {
       ? Number(userDb.institucion_verificada) === 1
       : false;
 
+    // Si la ciudad asociada fue desactivada en BD (ciudad_activa = 0), la residencia no está operativa
+    const isCiudadInactiva =
+      userDb.ciudad_activa !== undefined &&
+      userDb.ciudad_activa !== null &&
+      Number(userDb.ciudad_activa) === 0;
+
     return {
       id: userDb.id_usuario,
       email: userDb.email,
       role: normalizedDbRole, // Conserva la identidad real en BD ('admin', 'institucion', 'ciudadano')
-      id_ciudad: userDb.id_ciudad || null,
+      id_ciudad: isCiudadInactiva ? null : (userDb.id_ciudad || null),
+      id_ciudad_declarada: userDb.id_ciudad || null,
+      ciudad_activa: userDb.id_ciudad ? !isCiudadInactiva : false,
       id_institucion: userDb.id_institucion || null,
       institucion_verificada: isInstitucionVerificada,
     };
