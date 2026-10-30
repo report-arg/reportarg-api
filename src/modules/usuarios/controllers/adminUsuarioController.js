@@ -169,8 +169,8 @@ const userController = {
       const filas = await UserModel.update(id, { email, rol: nuevoRol, estado: estado || usuarioActual.estado });
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
 
-      // Si se inhabilitó la cuenta, revocar refresh tokens activos
-      if (estado === 'inactivo') {
+      // Si se inhabilitó la cuenta o cambió el rol, revocar refresh tokens activos
+      if (estado === 'inactivo' || (rol && nuevoRol !== rolActual)) {
         try {
           const RefreshTokenModel = require('../models/refreshTokenModel');
           await RefreshTokenModel.deleteByUserId(id);
@@ -232,6 +232,12 @@ const userController = {
 
       const filas = await UserModel.updateRol(id, nuevoRol);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+
+      // Revocar refresh tokens activos al cambiar el rol para impedir renovación con permisos obsoletos
+      try {
+        const RefreshTokenModel = require('../models/refreshTokenModel');
+        await RefreshTokenModel.deleteByUserId(id);
+      } catch (_) {}
 
       res.json({ ok: true, mensaje: `Rol actualizado correctamente a ${nuevoRol}` });
     } catch (err) {
@@ -363,6 +369,13 @@ const userController = {
         return res.status(400).json({ ok: false, mensaje: 'La nueva contraseña debe tener al menos 8 caracteres' });
 
       await UserModel.cambiarPassword(id, passwordActual, passwordNueva);
+
+      // Revocar refresh tokens activos al cambiar la contraseña
+      try {
+        const RefreshTokenModel = require('../models/refreshTokenModel');
+        await RefreshTokenModel.deleteByUserId(id);
+      } catch (_) {}
+
       res.json({ ok: true, mensaje: 'Contraseña actualizada correctamente' });
     } catch (err) {
       if (err.message === 'La contraseña actual es incorrecta') {

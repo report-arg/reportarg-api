@@ -25,15 +25,23 @@ const getUserFromToken = async (req) => {
     if (!userDb || !userDb.activo) return null;
 
     // El rol autorizado DEBE provenir del usuario actual en base de datos y no del token JWT
-    const normalizedDbRole = getCanonicalRole(userDb.tipo_usuario);
+    let normalizedDbRole = getCanonicalRole(userDb.tipo_usuario);
 
     // Regla estricta: No utilizar el rol del token como fallback cuando el rol de base de datos sea inexistente o inválido
     if (!normalizedDbRole) {
       return null;
     }
 
+    // Si la cuenta está vinculada a una entidad institucional (y no es admin), su identidad es institucional
+    // aunque el registro inicial tuviera un alias legacy ('usuario'), evitando que opere como ciudadano
+    if (userDb.id_institucion && normalizedDbRole !== ROLES.ADMIN) {
+      normalizedDbRole = ROLES.INSTITUCION;
+    }
+
     // Determinamos si la institución está formalmente verificada sin alterar el rol ni la identidad de la cuenta
-    const isInstitucionVerificada = userDb.institucion_verificada !== undefined && userDb.institucion_verificada !== null
+    const isInstitucionVerificada = Boolean(userDb.id_institucion) &&
+      userDb.institucion_verificada !== undefined &&
+      userDb.institucion_verificada !== null
       ? Number(userDb.institucion_verificada) === 1
       : false;
 
@@ -80,6 +88,14 @@ const requireRole = (...allowedRoles) => {
         error: 'No tenés permisos para realizar esta acción.',
         codigo: 'ROL_NO_AUTORIZADO',
         rolActual: req.user.role,
+      });
+    }
+
+    // Regla transversal: ninguna institución no verificada o inhabilitada puede ejecutar acciones protegidas
+    if (req.user.role === ROLES.INSTITUCION && !req.user.institucion_verificada) {
+      return res.status(403).json({
+        error: 'Institución pendiente de verificación o inhabilitada. Las capacidades operativas institucionales requieren aprobación previa.',
+        codigo: 'INSTITUCION_NO_VERIFICADA',
       });
     }
 

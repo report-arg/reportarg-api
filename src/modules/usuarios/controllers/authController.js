@@ -130,45 +130,64 @@ const resendCode = async (req, res, next) => {
 };
 
 const login = async (req, res, next) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
+
+  if (!email || !password || !String(email).trim() || !String(password)) {
+    return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+  }
 
   try {
-    const result = await authService.login(email, password);
+    const result = await authService.login(String(email).trim(), password);
     return res.status(200).json({
       message: 'Login exitoso',
       ...result
     });
   } catch (error) {
     if (error.status) {
-      return res.status(error.status).json({ error: error.message });
+      return res.status(error.status).json({ error: error.message, ...(error.codigo ? { codigo: error.codigo } : {}) });
     }
     next(error);
   }
 };
 
 const socialLogin = async (req, res, next) => {
-  const { email, provider, name } = req.body;
+  const { email, provider, name, providerToken, idToken, accessToken } = req.body || {};
 
-  if (!email || !provider) {
-    return res.status(400).json({ error: 'Email y provider son requeridos' });
+  if (!provider || !String(provider).trim()) {
+    return res.status(400).json({ error: 'El proveedor de autenticación es requerido' });
+  }
+
+  const resolvedToken = providerToken || idToken || accessToken;
+  if (!resolvedToken || typeof resolvedToken !== 'string' || !resolvedToken.trim()) {
+    return res.status(401).json({
+      error: 'Se requiere un token válido del proveedor externo para verificar la identidad',
+      codigo: 'TOKEN_PROVEEDOR_REQUERIDO',
+    });
   }
 
   try {
-    const result = await authService.socialLogin(email, provider, name);
+    const result = await authService.socialLogin({
+      provider: String(provider).trim(),
+      providerToken: resolvedToken.trim(),
+      idToken: idToken ? String(idToken).trim() : null,
+      accessToken: accessToken ? String(accessToken).trim() : null,
+      email: email ? String(email).trim() : null,
+      name: name ? String(name).trim() : null,
+    });
     return res.status(200).json({
       message: 'Login social exitoso',
       ...result
     });
   } catch (error) {
     if (error.status) {
-      return res.status(error.status).json({ error: error.message });
+      return res.status(error.status).json({ error: error.message, ...(error.codigo ? { codigo: error.codigo } : {}) });
     }
     next(error);
   }
 };
 
 const refreshToken = async (req, res, next) => {
-  const { token } = req.body;
+  const { token } = req.body || {};
   if (!token) {
     return res.status(401).json({ error: 'Refresh token es requerido' });
   }
@@ -178,14 +197,14 @@ const refreshToken = async (req, res, next) => {
     return res.json({ accessToken });
   } catch (error) {
     if (error.status) {
-      return res.status(error.status).json({ error: error.message });
+      return res.status(error.status).json({ error: error.message, ...(error.codigo ? { codigo: error.codigo } : {}) });
     }
     next(error);
   }
 };
 
 const logout = async (req, res, next) => {
-  const { token } = req.body;
+  const { token } = req.body || {};
 
   try {
     await authService.logout(token);
@@ -200,7 +219,15 @@ const me = async (req, res, next) => {
     const UserModel = require('../models/usuarioModel');
     const usuario = await UserModel.getById(req.user.id);
     if (!usuario) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
-    return res.json({ ok: true, data: usuario });
+    return res.json({
+      ok: true,
+      data: {
+        ...usuario,
+        rol: req.user.role,
+        id_institucion: req.user.id_institucion ?? usuario.id_institucion ?? null,
+        institucion_verificada: req.user.institucion_verificada,
+      },
+    });
   } catch (error) {
     next(error);
   }

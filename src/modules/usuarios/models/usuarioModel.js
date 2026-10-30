@@ -9,7 +9,9 @@ const UserModel = {
   async getProfileData(userId) {
     const [[perfilRow]] = await db.query(`
       SELECT COALESCE(CONCAT(c.nombre, ' ', c.apellido), i.nombre) AS nombre,
-             COALESCE(c.foto_perfil, i.foto_perfil) AS foto
+             COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
+             i.id_institucion,
+             i.verificada AS institucion_verificada
       FROM usuarios u
       LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
       LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
@@ -39,10 +41,10 @@ const UserModel = {
     );
   },
 
-  async updateSocialAuth(userId, { email_verified, auth_provider, activo }) {
+  async updateSocialAuth(userId, { email_verified, auth_provider }) {
     await db.query(
-      `UPDATE usuarios SET email_verified = ?, auth_provider = COALESCE(auth_provider, ?), activo = ? WHERE id_usuario = ?`,
-      [email_verified ? 1 : 0, auth_provider, activo ? 1 : 0, userId]
+      `UPDATE usuarios SET email_verified = ?, auth_provider = COALESCE(auth_provider, ?) WHERE id_usuario = ?`,
+      [email_verified ? 1 : 0, auth_provider, userId]
     );
   },
 

@@ -138,7 +138,7 @@ describe('HU-17: Actualizaciones de Reclamos según Estado', () => {
   test('4. La institución asignada puede publicar actualización cuando el reclamo está En revisión', async () => {
     db.query.mockImplementation(async (sql, params) => {
       if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
-        return [[{ id_usuario: 10, email: 'inst@test.com', activo: 1, tipo_usuario: 'institucion', id_ciudad: 1, id_institucion: 3 }]];
+        return [[{ id_usuario: 10, email: 'inst@test.com', activo: 1, tipo_usuario: 'institucion', id_ciudad: 1, id_institucion: 3, institucion_verificada: 1 }]];
       }
       if (typeof sql === 'string' && sql.includes('FROM reclamos r') && sql.includes('WHERE r.id_reclamo = ?')) {
         return [[{
@@ -172,7 +172,7 @@ describe('HU-17: Actualizaciones de Reclamos según Estado', () => {
   test('5. Una institución no asignada no puede publicar actualización en el reclamo (403)', async () => {
     db.query.mockImplementation(async (sql, params) => {
       if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
-        return [[{ id_usuario: 20, email: 'otherinst@test.com', activo: 1, tipo_usuario: 'institucion', id_ciudad: 1, id_institucion: 99 }]];
+        return [[{ id_usuario: 20, email: 'otherinst@test.com', activo: 1, tipo_usuario: 'institucion', id_ciudad: 1, id_institucion: 99, institucion_verificada: 1 }]];
       }
       if (typeof sql === 'string' && sql.includes('FROM reclamos r') && sql.includes('WHERE r.id_reclamo = ?')) {
         return [[{
@@ -199,7 +199,7 @@ describe('HU-17: Actualizaciones de Reclamos según Estado', () => {
   test('6. No se puede publicar actualización si el reclamo está Resuelto o Cancelado (400)', async () => {
     db.query.mockImplementation(async (sql, params) => {
       if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
-        return [[{ id_usuario: 10, email: 'inst@test.com', activo: 1, tipo_usuario: 'institucion', id_ciudad: 1, id_institucion: 3 }]];
+        return [[{ id_usuario: 10, email: 'inst@test.com', activo: 1, tipo_usuario: 'institucion', id_ciudad: 1, id_institucion: 3, institucion_verificada: 1 }]];
       }
       if (typeof sql === 'string' && sql.includes('FROM reclamos r') && sql.includes('WHERE r.id_reclamo = ?')) {
         return [[{

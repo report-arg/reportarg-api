@@ -145,6 +145,20 @@ describe('Etapa 1: Seguridad e Integridad de Datos (ADMIN-01)', () => {
       expect(res.status).toBe(401);
       expect(res.body.error).toMatch(/token no proporcionado o inválido/i);
     });
+
+    test('Un token JWT vencido (expirado) es rechazado inmediatamente con 401', async () => {
+      const jwt = require('jsonwebtoken');
+      const secret = process.env.JWT_SECRET || 'test-secret-key';
+      process.env.JWT_SECRET = secret;
+      const expiredToken = jwt.sign({ id: 102, email: 'user@test.com', role: 'ciudadano' }, secret, { expiresIn: '-10s' });
+
+      const res = await request(app)
+        .get('/api/reclamos/mis-reclamos')
+        .set('Authorization', `Bearer ${expiredToken}`);
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/token no proporcionado o inválido/i);
+    });
   });
 
   describe('3. Permisos institucionales según el estado actual de la cuenta', () => {
@@ -238,6 +252,41 @@ describe('Etapa 1: Seguridad e Integridad de Datos (ADMIN-01)', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.ok).toBe(true);
+    });
+
+    test('Institución no verificada no puede publicar comentarios ni actualizaciones mediante rutas compartidas (403)', async () => {
+      const token = generateTestToken(ROLES.INSTITUCION, 203);
+
+      db.query = jest.fn().mockImplementation(async (sql) => {
+        if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+          return [[{
+            id_usuario: 203,
+            email: 'inst_pendiente2@test.com',
+            activo: 1,
+            tipo_usuario: 'usuario', // Incluso con alias legacy en BD, al tener id_institucion se valida como institución
+            id_ciudad: 1,
+            id_institucion: 52,
+            institucion_verificada: 0,
+          }]];
+        }
+        return [[]];
+      });
+
+      const resComentario = await request(app)
+        .post('/api/comentarios')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ id_reclamo: 10, texto: 'Intento de comentar sin verificación' });
+
+      expect(resComentario.status).toBe(403);
+      expect(resComentario.body.codigo).toBe('INSTITUCION_NO_VERIFICADA');
+
+      const resActualizacion = await request(app)
+        .post('/api/reclamos/10/actualizaciones')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ texto: 'Intento de actualizar sin verificación' });
+
+      expect(resActualizacion.status).toBe(403);
+      expect(resActualizacion.body.codigo).toBe('INSTITUCION_NO_VERIFICADA');
     });
   });
 

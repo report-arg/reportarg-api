@@ -121,7 +121,10 @@ const reclamoController = {
       if (reclamo.visibilidad === 'privado') {
         const esAutor = Number(req.user.id) === Number(reclamo.id_usuario);
         const esAdmin = req.user.role === ROLES.ADMIN;
-        const esInstitucionAsignada = req.user.role === ROLES.INSTITUCION && Number(req.user.id_institucion) === Number(reclamo.id_institucion);
+        const esInstitucionAsignada =
+          req.user.role === ROLES.INSTITUCION &&
+          Boolean(req.user.institucion_verificada) &&
+          Number(req.user.id_institucion) === Number(reclamo.id_institucion);
 
         if (!esAutor && !esAdmin && !esInstitucionAsignada) {
           return res.status(403).json({
@@ -160,6 +163,23 @@ const reclamoController = {
   async obtenerActualizaciones(req, res, next) {
     try {
       const { id } = req.params;
+      const reclamo = await ReclamoModel.getById(id);
+      if (reclamo && reclamo.visibilidad === 'privado') {
+        const esAutor = req.user?.id && Number(req.user.id) === Number(reclamo.id_usuario);
+        const esAdmin = req.user?.role === ROLES.ADMIN;
+        const esInstitucionAsignada =
+          req.user?.role === ROLES.INSTITUCION &&
+          Boolean(req.user?.institucion_verificada) &&
+          Number(req.user?.id_institucion) === Number(reclamo.id_institucion);
+
+        if (!esAutor && !esAdmin && !esInstitucionAsignada) {
+          return res.status(403).json({
+            ok: false,
+            mensaje: 'Acceso denegado: Este reclamo es privado y sus actualizaciones solo pueden ser consultadas por personas autorizadas.',
+          });
+        }
+      }
+
       const data = await ActualizacionModel.getByReclamo(id);
       res.json({ ok: true, data });
     } catch (err) {
@@ -247,6 +267,14 @@ const reclamoController = {
       const idUsuario = req.user.id;
       const rolUsuario = req.user.role;
       const idInstitucionUsuario = req.user.id_institucion;
+
+      if (rolUsuario === ROLES.INSTITUCION && !req.user.institucion_verificada) {
+        return res.status(403).json({
+          ok: false,
+          error: 'Institución pendiente de verificación o inhabilitada. Las capacidades operativas institucionales requieren aprobación previa.',
+          codigo: 'INSTITUCION_NO_VERIFICADA',
+        });
+      }
 
       await reclamoWorkflowService.agregarActualizacion(id, idUsuario, rolUsuario, idInstitucionUsuario, texto);
       res.json({ ok: true, mensaje: 'Actualización agregada correctamente' });

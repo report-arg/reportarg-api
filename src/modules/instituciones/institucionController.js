@@ -72,6 +72,14 @@ const institutionController = {
 
       await InstitutionModel.rechazar(req.params.id);
 
+      // Revocar refresh tokens activos del usuario institucional rechazado/inhabilitado
+      if (institucion.id_usuario) {
+        try {
+          const RefreshTokenModel = require('../usuarios/models/refreshTokenModel');
+          await RefreshTokenModel.deleteByUserId(institucion.id_usuario);
+        } catch (_) {}
+      }
+
       // Enviar email de rechazo con motivo
       try {
         await emailService.enviarRechazoInstitucion(
