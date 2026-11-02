@@ -1,4 +1,31 @@
+const path = require('path');
 const db = require('../config/db');
+
+// Fallback robusto en memoria con el dataset completo INDEC/Georef cargado
+let catalogoLocalidadesMemoria = [];
+let mapaLocalidadesPorProvincia = new Map();
+
+try {
+  const jsonPath = path.join(__dirname, '..', 'data', 'localidades_ar.json');
+  catalogoLocalidadesMemoria = require(jsonPath);
+  for (const item of catalogoLocalidadesMemoria) {
+    const provKey = String(item.provincia || '').trim().toLowerCase();
+    if (!mapaLocalidadesPorProvincia.has(provKey)) {
+      mapaLocalidadesPorProvincia.set(provKey, []);
+    }
+    mapaLocalidadesPorProvincia.get(provKey).push(item);
+  }
+} catch (e) {
+  catalogoLocalidadesMemoria = [];
+  mapaLocalidadesPorProvincia = new Map();
+}
+
+const PROVINCIAS_AR = Object.freeze([
+  'Buenos Aires', 'Catamarca', 'Chaco', 'Chubut', 'Ciudad Autónoma de Buenos Aires',
+  'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja',
+  'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis',
+  'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán',
+]);
 
 const CATALOGO_CIUDADES_AR = Object.freeze({
   'buenos aires': ['la plata', 'mar del plata', 'quilmes', 'lanús', 'lanus', 'lomas de zamora', 'morón', 'moron', 'tres de febrero', 'san martín', 'san martin', 'tigre', 'bahía blanca', 'bahia blanca', 'tandil', 'pergamino'],
@@ -37,6 +64,10 @@ const CATALOGO_CIUDADES_AR = Object.freeze({
  * Servicio centralizado para resolución territorial y ciudades activas.
  */
 const cityService = {
+  getProvincias() {
+    return PROVINCIAS_AR;
+  },
+
   async getActiveById(id) {
     const [rows] = await db.query('SELECT id_ciudad, nombre, provincia FROM ciudades WHERE id_ciudad = ? AND activa = 1', [id]);
     return rows[0] || null;
@@ -64,7 +95,86 @@ const cityService = {
   },
 
   /**
-   * Verifica si una ciudad existe en el catálogo territorial oficial o en la tabla `ciudades` (activa o inactiva).
+   * Lista localidades oficiales para una provincia, con búsqueda opcional por texto `q`,
+   * cruzando contra la tabla `ciudades` para indicar si cada una se encuentra activa en ReportARG.
+   */
+  async listLocalidades({ provincia, q, limit = 100 }) {
+    if (!provincia) return [];
+    const provClean = String(provincia).trim();
+    const provKey = provClean.toLowerCase();
+    const queryTerm = q ? String(q).trim().toLowerCase() : '';
+    const maxLimit = Math.min(Math.max(Number(limit) || 50, 1), 300);
+
+    // Obtener ciudades activas en ReportARG para la provincia indicada
+    let ciudadesActivasMap = new Map();
+    try {
+      const [activasRows] = await db.query(
+        'SELECT id_ciudad, nombre, provincia FROM ciudades WHERE LOWER(provincia) = ? AND activa = 1',
+        [provKey]
+      );
+      for (const row of activasRows) {
+        ciudadesActivasMap.set(String(row.nombre).trim().toLowerCase(), row.id_ciudad);
+      }
+    } catch (e) {
+      // Ignorar error si la tabla aún no estuviera disponible
+    }
+
+    // 1. Intentar consultar la tabla `localidades_ar`
+    try {
+      let sql = 'SELECT id, id_indec, nombre, provincia FROM localidades_ar WHERE LOWER(provincia) = ?';
+      const params = [provKey];
+
+      if (queryTerm) {
+        sql += ' AND LOWER(nombre) LIKE ?';
+        params.push(`%${queryTerm}%`);
+      }
+
+      sql += ' ORDER BY nombre ASC LIMIT ?';
+      params.push(maxLimit);
+
+      const [rows] = await db.query(sql, params);
+      if (rows && rows.length > 0) {
+        return rows.map((r) => {
+          const nomClean = String(r.nombre).trim().toLowerCase();
+          const idActiva = ciudadesActivasMap.get(nomClean) || null;
+          return {
+            id: r.id,
+            id_indec: r.id_indec,
+            nombre: r.nombre,
+            provincia: r.provincia,
+            activa: Boolean(idActiva),
+            id_ciudad_activa: idActiva,
+          };
+        });
+      }
+    } catch (dbErr) {
+      // Si la tabla aún no existe o hay error en BD, usar el fallback en memoria
+    }
+
+    // 2. Fallback: usar el padrón oficial en memoria
+    const listaProv = mapaLocalidadesPorProvincia.get(provKey) || [];
+    let filtradas = listaProv;
+    if (queryTerm) {
+      filtradas = listaProv.filter((l) => String(l.nombre).toLowerCase().includes(queryTerm));
+    }
+
+    return filtradas.slice(0, maxLimit).map((item, idx) => {
+      const nomClean = String(item.nombre).trim().toLowerCase();
+      const idActiva = ciudadesActivasMap.get(nomClean) || null;
+      return {
+        id: idx + 1,
+        id_indec: item.id_indec,
+        nombre: item.nombre,
+        provincia: item.provincia,
+        activa: Boolean(idActiva),
+        id_ciudad_activa: idActiva,
+      };
+    });
+  },
+
+  /**
+   * Verifica si una ciudad existe en el catálogo territorial oficial (BD o memoria)
+   * o en la tabla `ciudades` (activa o inactiva).
    */
   async existsCity(nombreNombre, provinciaNombre, connection = db) {
     if (!nombreNombre || !provinciaNombre) return false;
@@ -76,18 +186,44 @@ const cityService = {
       return false;
     }
 
+    // 1. Verificar catálogo histórico en memoria
     const listaProvincia = CATALOGO_CIUDADES_AR[provinciaClean];
     if (Array.isArray(listaProvincia) && listaProvincia.includes(nombreClean)) {
       return true;
     }
 
-    const [rows] = await connection.query(
+    // 2. Verificar padrón oficial completo en memoria
+    const padronProv = mapaLocalidadesPorProvincia.get(provinciaClean);
+    if (Array.isArray(padronProv)) {
+      const matchPadron = padronProv.some(
+        (l) => String(l.nombre).trim().toLowerCase() === nombreClean
+      );
+      if (matchPadron) return true;
+    }
+
+    // 3. Verificar tabla `localidades_ar` en base de datos si existe
+    try {
+      const resultLoc = await connection.query(
+        `SELECT id FROM localidades_ar
+         WHERE LOWER(nombre) = ? AND LOWER(provincia) = ?
+         LIMIT 1`,
+        [nombreClean, provinciaClean]
+      );
+      const rowsLoc = Array.isArray(resultLoc) ? resultLoc[0] : resultLoc;
+      if (rowsLoc && rowsLoc[0]) return true;
+    } catch (e) {
+      // Ignorar si la tabla no existe aún en el ambiente
+    }
+
+    // 4. Verificar tabla `ciudades` (activa o inactiva)
+    const result = await connection.query(
       `SELECT id_ciudad, nombre, provincia, activa FROM ciudades
        WHERE LOWER(nombre) = ? AND LOWER(provincia) = ?
        LIMIT 1`,
       [nombreClean, provinciaClean]
     );
 
+    const rows = Array.isArray(result) ? result[0] : result;
     return Boolean(rows && rows[0]);
   },
 

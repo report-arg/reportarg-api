@@ -51,6 +51,51 @@ describe('Pruebas de Aislamiento Territorial y Reglas de Negocio', () => {
       const res = await cityService.findActiveCity('CiudadInexistente');
       expect(res).toBeNull();
     });
+
+    test('getProvincias devuelve las 24 provincias argentinas', () => {
+      const provincias = cityService.getProvincias();
+      expect(Array.isArray(provincias)).toBe(true);
+      expect(provincias.length).toBe(24);
+      expect(provincias).toContain('Entre Ríos');
+      expect(provincias).toContain('La Pampa');
+    });
+
+    test('listLocalidades devuelve localidades oficiales con estado activa/inactiva', async () => {
+      db.query.mockImplementation(async (sql) => {
+        if (typeof sql === 'string' && sql.includes('FROM ciudades WHERE LOWER(provincia) = ?')) {
+          return [[{ id_ciudad: 1, nombre: 'Viale', provincia: 'Entre Ríos' }]];
+        }
+        return [[]];
+      });
+
+      const res = await cityService.listLocalidades({ provincia: 'Entre Ríos', q: 'viale' });
+      expect(Array.isArray(res)).toBe(true);
+      expect(res.length).toBeGreaterThan(0);
+      const viale = res.find((l) => l.nombre.toLowerCase() === 'viale');
+      expect(viale).toBeDefined();
+      expect(viale.activa).toBe(true);
+      expect(viale.id_ciudad_activa).toBe(1);
+    });
+
+    test('GET /api/ciudades/provincias y GET /api/ciudades/localidades responden correctamente', async () => {
+      db.query.mockImplementation(async (sql) => {
+        if (typeof sql === 'string' && sql.includes('FROM ciudades WHERE LOWER(provincia) = ?')) {
+          return [[{ id_ciudad: 1, nombre: 'Viale', provincia: 'Entre Ríos' }]];
+        }
+        return [[]];
+      });
+
+      const resProv = await request(app).get('/api/ciudades/provincias');
+      expect(resProv.status).toBe(200);
+      expect(resProv.body.ok).toBe(true);
+      expect(resProv.body.data.length).toBe(24);
+
+      const resLoc = await request(app).get('/api/ciudades/localidades?provincia=Entre Ríos&q=viale');
+      expect(resLoc.status).toBe(200);
+      expect(resLoc.body.ok).toBe(true);
+      expect(resLoc.body.data[0].nombre).toBe('Viale');
+      expect(resLoc.body.data[0].activa).toBe(true);
+    });
   });
 
   describe('B. Feed y Aislamiento por Ciudad', () => {
