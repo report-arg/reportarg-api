@@ -5,8 +5,8 @@ const institutionController = {
 
   async listar(req, res, next) {
     try {
-      const { estado, busqueda, pagina = 1, limite = 20 } = req.query;
-      const result = await InstitutionModel.getAll({ estado, busqueda, pagina, limite });
+      const { estado, id_ciudad, busqueda, pagina = 1, limite = 20 } = req.query;
+      const result = await InstitutionModel.getAll({ estado, id_ciudad, busqueda, pagina, limite });
       res.json({
         ok: true,
         data: result.rows,
@@ -42,7 +42,7 @@ const institutionController = {
         return res.status(409).json({ ok: false, mensaje: 'La institución ya está verificada' });
       }
 
-      await InstitutionModel.verificar(req.params.id);
+      await InstitutionModel.verificar(req.params.id, req.user?.id || null);
 
       // Enviar email de aprobación
       try {
@@ -70,7 +70,8 @@ const institutionController = {
         return res.status(404).json({ ok: false, mensaje: 'Institución no encontrada' });
       }
 
-      await InstitutionModel.rechazar(req.params.id);
+      const motivoLimpio = motivo.trim();
+      await InstitutionModel.rechazar(req.params.id, motivoLimpio, req.user?.id || null);
 
       // Revocar refresh tokens activos del usuario institucional rechazado/inhabilitado
       if (institucion.id_usuario) {

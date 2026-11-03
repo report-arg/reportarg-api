@@ -456,8 +456,24 @@ const ClaimModel = {
       await connection.beginTransaction();
       const [[reclamo]] = await connection.query('SELECT id_usuario, titulo, id_ciudad, id_institucion, estado FROM reclamos WHERE id_reclamo = ? FOR UPDATE', [idReclamo]);
       if (!reclamo) throw Object.assign(new Error('Reclamo no encontrado'), { status: 404 });
-      const [[institucion]] = await connection.query('SELECT id_institucion, id_ciudad, nombre FROM instituciones WHERE id_institucion = ? FOR UPDATE', [idNuevaInstitucion]);
+      const [[institucion]] = await connection.query(
+        `SELECT i.id_institucion, i.id_ciudad, i.nombre, i.verificada, i.status, u.activo AS usuario_activo
+         FROM instituciones i
+         LEFT JOIN usuarios u ON u.id_usuario = i.id_usuario
+         WHERE i.id_institucion = ? FOR UPDATE`,
+        [idNuevaInstitucion]
+      );
       if (!institucion) throw Object.assign(new Error('La institución destino no existe'), { status: 404 });
+      if (
+        (institucion.verificada !== undefined && Number(institucion.verificada) !== 1) ||
+        (institucion.status !== undefined && institucion.status !== 'approved') ||
+        (institucion.usuario_activo !== undefined && Number(institucion.usuario_activo) !== 1)
+      ) {
+        throw Object.assign(
+          new Error('La institución destino debe estar verificada, aprobada y activa para recibir reclamos'),
+          { status: 400 }
+        );
+      }
       if (!reclamo.id_ciudad || Number(institucion.id_ciudad) !== Number(reclamo.id_ciudad)) {
         throw Object.assign(new Error('La institución destino debe pertenecer a la misma ciudad del reclamo'), { status: 400 });
       }
@@ -469,6 +485,20 @@ const ClaimModel = {
       await HistorialModel.registrar({ id_reclamo: idReclamo, id_usuario: idAdmin, tipo_evento: 'REASIGNACION',
         detalle: `Institución anterior ID ${reclamo.id_institucion || 'Sin asignar'} -> nueva ${institucion.nombre} (ID ${idNuevaInstitucion}). Motivo: ${motivo || 'Intervención administrativa'}`,
         estado_anterior: reclamo.estado, estado_nuevo: reclamo.estado }, connection);
+
+      const AuditoriaModel = require('../../admin/auditoriaModel');
+      await AuditoriaModel.registrar(
+        {
+          idActor: idAdmin,
+          entidadTipo: 'reclamo',
+          entidadId: Number(idReclamo),
+          accion: 'REASIGNAR_RECLAMO',
+          motivo: motivo || 'Intervención administrativa',
+          datosPrevios: { id_institucion: reclamo.id_institucion || null },
+          datosNuevos: { id_institucion: Number(idNuevaInstitucion), institucion_nombre: institucion.nombre },
+        },
+        connection
+      );
 
       const NotificationService = require('../../notificaciones/notificacionService');
       if (reclamo.id_usuario) {

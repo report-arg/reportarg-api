@@ -13,7 +13,9 @@ const getUserFromToken = async (req) => {
     if (!decoded?.id) return null;
 
     const [rows] = await db.query(
-      `SELECT u.id_usuario, u.email, u.activo, u.tipo_usuario, u.id_ciudad, c.activa AS ciudad_activa, i.id_institucion, i.verificada AS institucion_verificada
+      `SELECT u.id_usuario, u.email, u.activo, u.tipo_usuario, u.id_ciudad, c.activa AS ciudad_activa,
+              i.id_institucion, i.verificada AS institucion_verificada,
+              i.status AS institucion_status, i.fecha_rechazo
        FROM usuarios u
        LEFT JOIN ciudades c ON c.id_ciudad = u.id_ciudad
        LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
@@ -24,6 +26,20 @@ const getUserFromToken = async (req) => {
 
     // Si el usuario no existe en BD o fue inhabilitado (activo = 0), denegar acceso inmediatamente
     if (!userDb || !userDb.activo) return null;
+
+    // Regla ADMIN-01: si la institución fue rechazada y superó la ventana de gracia de 7 días, desactivar cuenta
+    if (
+      userDb.id_institucion &&
+      userDb.institucion_status === 'rejected' &&
+      userDb.fecha_rechazo
+    ) {
+      const elapsedMs = Date.now() - new Date(userDb.fecha_rechazo).getTime();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      if (Number.isFinite(elapsedMs) && elapsedMs > sevenDaysMs) {
+        await db.query('UPDATE usuarios SET activo = 0 WHERE id_usuario = ?', [userDb.id_usuario]);
+        return null;
+      }
+    }
 
     // El rol autorizado DEBE provenir del usuario actual en base de datos y no del token JWT
     let normalizedDbRole = getCanonicalRole(userDb.tipo_usuario);
@@ -61,6 +77,8 @@ const getUserFromToken = async (req) => {
       ciudad_activa: userDb.id_ciudad ? !isCiudadInactiva : false,
       id_institucion: userDb.id_institucion || null,
       institucion_verificada: isInstitucionVerificada,
+      institucion_status: userDb.institucion_status || null,
+      fecha_rechazo: userDb.fecha_rechazo || null,
     };
   } catch (error) {
     return null;

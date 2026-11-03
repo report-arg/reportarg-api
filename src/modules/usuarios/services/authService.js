@@ -320,6 +320,8 @@ const authService = {
         id_usuario: userId,
         nombre: institutionName,
         tipo: institutionType,
+        cuit: cuit ? String(cuit).trim() : null,
+        nombre_contacto: contactName ? String(contactName).trim() : null,
         telefono: phone,
         provincia,
         ciudad,
@@ -398,6 +400,25 @@ const authService = {
       userType = ROLES.INSTITUCION;
     }
 
+    // Regla ADMIN-01: si la institución fue rechazada y superó la ventana de gracia de 7 días, inhabilitar cuenta
+    if (
+      perfilRow?.id_institucion &&
+      perfilRow.institucion_status === 'rejected' &&
+      perfilRow.fecha_rechazo
+    ) {
+      const elapsedMs = Date.now() - new Date(perfilRow.fecha_rechazo).getTime();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      if (Number.isFinite(elapsedMs) && elapsedMs > sevenDaysMs) {
+        await UserModel.setEstado(userId, false);
+        await RefreshTokenModel.deleteByUserId(userId);
+        throwError(
+          403,
+          'El plazo de 7 días tras el rechazo de la solicitud institucional ha expirado y la cuenta fue cerrada.',
+          'CUENTA_DESHABILITADA'
+        );
+      }
+    }
+
     const { accessToken, refreshToken } = this.createTokens(userId, user.email, userType);
     await this.saveRefreshToken(refreshToken, userId, userType);
 
@@ -418,6 +439,9 @@ const authService = {
         id_ciudad: user.id_ciudad || null,
         id_institucion: perfilRow?.id_institucion || null,
         institucion_verificada: institucionVerificada,
+        institucion_status: perfilRow?.institucion_status || null,
+        motivo_rechazo: perfilRow?.motivo_rechazo || null,
+        fecha_rechazo: perfilRow?.fecha_rechazo || null,
       }
     };
   },

@@ -142,16 +142,31 @@ describe('HU-21: Reasignación Administrativa de Reclamos', () => {
     expect(res.body.mensaje).toMatch(/ya está asignado/i);
   });
 
+  test('Error: No se puede reasignar a una institución no verificada, rechazada o con usuario inactivo (400)', async () => {
+    mockConnQuery
+      .mockResolvedValueOnce([[{ id_reclamo: 1, id_ciudad: 10, id_institucion: 2, estado: 'Pendiente' }]])
+      .mockResolvedValueOnce([[{ id_institucion: 5, id_ciudad: 10, nombre: 'Inst Rechazada', verificada: 0, status: 'rejected', usuario_activo: 1 }]]);
+
+    const res = await request(app)
+      .patch('/api/admin/reclamos/1/institucion')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ id_institucion: 5, motivo: 'Intento a institución rechazada' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.mensaje).toMatch(/verificada, aprobada y activa/i);
+  });
+
   test('Éxito: Reasignación administrativa correcta (actualiza institución y registra historial)', async () => {
     let updateCalled = false;
     let historyCalled = false;
+    let auditCalled = false;
 
     mockConnQuery.mockImplementation(async (sql) => {
       if (sql.includes('FROM reclamos')) {
         return [[{ id_reclamo: 1, id_ciudad: 10, id_institucion: 2, estado: 'Pendiente' }]];
       }
       if (sql.includes('FROM instituciones')) {
-        return [[{ id_institucion: 5, id_ciudad: 10, nombre: 'Nueva Institución' }]];
+        return [[{ id_institucion: 5, id_ciudad: 10, nombre: 'Nueva Institución', verificada: 1, status: 'approved', usuario_activo: 1 }]];
       }
       if (sql.includes('UPDATE reclamos')) {
         updateCalled = true;
@@ -160,6 +175,10 @@ describe('HU-21: Reasignación Administrativa de Reclamos', () => {
       if (sql.includes('INSERT INTO reclamos_historial')) {
         historyCalled = true;
         return [{ insertId: 100 }];
+      }
+      if (sql.includes('INSERT INTO admin_auditoria')) {
+        auditCalled = true;
+        return [{ insertId: 200 }];
       }
       return [[]];
     });
@@ -171,9 +190,10 @@ describe('HU-21: Reasignación Administrativa de Reclamos', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    // Verificar que se actualizó la institución Y se registró el historial (reglas HU-21)
+    // Verificar que se actualizó la institución Y se registró el historial y la auditoría (reglas HU-21 / ADMIN-01)
     expect(updateCalled).toBe(true);
     expect(historyCalled).toBe(true);
+    expect(auditCalled).toBe(true);
   });
 
 });

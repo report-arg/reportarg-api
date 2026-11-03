@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const { verifyToken, requireAdmin } = require('./middlewares/authMiddleware');
+const { verifyToken, requireAdmin, requireRole } = require('./middlewares/authMiddleware');
+const { ROLES } = require('./constants/roles');
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 
 dotenv.config({ quiet: true });
@@ -26,16 +27,22 @@ const {
 
 app.use('/api/auth', authRoutes);
 
-const { uploadRoutes, searchRoutes, ciudadRoutes } = require('./modules/admin');
+const { uploadRoutes, searchRoutes, ciudadRoutes, auditoriaRoutes } = require('./modules/admin');
 
 app.use('/api/admin/usuarios/me', verifyToken, adminProfileRoutes);
-app.use('/api/admin/upload', verifyToken, uploadRoutes);
+app.use(
+  '/api/admin/upload',
+  verifyToken,
+  requireRole(ROLES.ADMIN, ROLES.CIUDADANO, ROLES.INSTITUCION),
+  uploadRoutes
+);
 
 const { notificacionRoutes } = require('./modules/notificaciones');
 app.use('/api/notificaciones', verifyToken, notificacionRoutes);
 
 app.use('/api/admin', verifyToken, requireAdmin);
 
+app.use('/api/admin/auditoria', auditoriaRoutes);
 app.use('/api/admin/usuarios', adminUsuarioRoutes);
 
 const { categoriaRoutes } = require('./modules/categorias');

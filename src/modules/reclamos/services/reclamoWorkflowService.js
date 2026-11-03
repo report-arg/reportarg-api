@@ -60,8 +60,14 @@ const reclamoWorkflowService = {
       throwError(400, `Has alcanzado el límite máximo de ${BUSINESS_RULES.CLAIM_MAX_PENDING_PER_CITIZEN} reclamos simultáneos en estado Pendiente. Esperá a que las instituciones avancen en la gestión de tus reclamos anteriores para crear uno nuevo.`);
     }
 
-    // 2. Coordinación
+    // 2. Coordinación — Regla ADMIN-01 (Sección 7): no aceptar reclamos sin institución responsable válida
     const id_institucion = await resolverInstitucionAsignada(id_ciudad, id_categoria);
+    if (!id_institucion) {
+      throwError(
+        409,
+        'La ciudad seleccionada no cuenta actualmente con una institución principal o responsable habilitada para recibir reclamos.'
+      );
+    }
 
     const id = await ClaimModel.crear({
       titulo: titulo.trim(),

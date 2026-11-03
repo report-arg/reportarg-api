@@ -11,7 +11,10 @@ const UserModel = {
       SELECT COALESCE(CONCAT(c.nombre, ' ', c.apellido), i.nombre) AS nombre,
              COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
              i.id_institucion,
-             i.verificada AS institucion_verificada
+             i.verificada AS institucion_verificada,
+             i.status AS institucion_status,
+             i.motivo_rechazo,
+             i.fecha_rechazo
       FROM usuarios u
       LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
       LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario

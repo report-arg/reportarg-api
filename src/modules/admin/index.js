@@ -5,4 +5,7 @@ module.exports = {
   uploadRoutes: require('./uploadRoutes'),
   ciudadController: require('./ciudadController'),
   ciudadRoutes: require('./ciudadRoutes'),
+  auditoriaModel: require('./auditoriaModel'),
+  auditoriaController: require('./auditoriaController'),
+  auditoriaRoutes: require('./auditoriaRoutes'),
 };

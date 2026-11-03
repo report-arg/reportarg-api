@@ -318,4 +318,37 @@ describe('Módulo de Administración de Instituciones y Solicitudes (ADMIN-01 �
       );
     });
   });
+
+  describe('6. Auditoría Administrativa (GET /api/admin/auditoria)', () => {
+    test('permite al administrador consultar eventos de auditoría por entidad', async () => {
+      mockDbQuery({
+        extra: (sql) => {
+          if (typeof sql === 'string' && sql.includes('FROM admin_auditoria a')) {
+            return [[
+              {
+                id: 1,
+                id_actor: 1,
+                actor_email: 'admin@reportarg.gob.ar',
+                entidad_tipo: 'institucion',
+                entidad_id: 8,
+                accion: 'RECHAZAR_INSTITUCION',
+                motivo: 'Documentación incompleta',
+                fecha_creacion: new Date().toISOString(),
+              },
+            ]];
+          }
+          return [[]];
+        },
+      });
+
+      const res = await request(app)
+        .get('/api/admin/auditoria/institucion/8')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].accion).toBe('RECHAZAR_INSTITUCION');
+    });
+  });
 });

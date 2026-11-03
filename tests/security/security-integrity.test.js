@@ -441,4 +441,111 @@ describe('Etapa 1: Seguridad e Integridad de Datos (ADMIN-01)', () => {
       expect(res.body.ok).toBe(true);
     });
   });
+
+  describe('7. Reglas ADMIN-01 Etapa 1: Upload protegido, vencimiento de rechazo y bloqueo de reclamos huérfanos', () => {
+    test('Institución no verificada no puede subir archivos a /api/admin/upload/foto (403)', async () => {
+      const token = generateTestToken(ROLES.INSTITUCION, 201);
+
+      db.query = jest.fn().mockImplementation(async (sql) => {
+        if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+          return [[{
+            id_usuario: 201,
+            email: 'inst_pendiente@test.com',
+            activo: 1,
+            tipo_usuario: 'institucion',
+            id_ciudad: 1,
+            id_institucion: 50,
+            institucion_verificada: 0,
+            institucion_status: 'pending',
+          }]];
+        }
+        return [[]];
+      });
+
+      const res = await request(app)
+        .post('/api/admin/upload/foto')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.codigo).toBe('INSTITUCION_NO_VERIFICADA');
+    });
+
+    test('Institución rechazada hace más de 7 días se inhabilita automáticamente y recibe 401', async () => {
+      const token = generateTestToken(ROLES.INSTITUCION, 205);
+      const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+      let userDisabledSqlCalled = false;
+
+      db.query = jest.fn().mockImplementation(async (sql) => {
+        if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+          return [[{
+            id_usuario: 205,
+            email: 'inst_vencida@test.com',
+            activo: 1,
+            tipo_usuario: 'institucion',
+            id_ciudad: 1,
+            id_institucion: 55,
+            institucion_verificada: 0,
+            institucion_status: 'rejected',
+            fecha_rechazo: eightDaysAgo,
+          }]];
+        }
+        if (typeof sql === 'string' && sql.includes('UPDATE usuarios SET activo = 0')) {
+          userDisabledSqlCalled = true;
+          return [{ affectedRows: 1 }];
+        }
+        return [[]];
+      });
+
+      const res = await request(app)
+        .get('/api/notificaciones')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(401);
+      expect(userDisabledSqlCalled).toBe(true);
+    });
+
+    test('No permite crear un reclamo si la ciudad no tiene institución responsable ni principal válida (409)', async () => {
+      const citizenToken = generateTestToken(ROLES.CIUDADANO, 5);
+
+      db.query = jest.fn().mockImplementation(async (sql) => {
+        if (typeof sql === 'string' && sql.includes('FROM usuarios u')) {
+          return [[{
+            id_usuario: 5,
+            email: 'ciudadano@test.com',
+            activo: 1,
+            tipo_usuario: 'ciudadano',
+            id_ciudad: 1,
+            ciudad_activa: 1,
+          }]];
+        }
+        if (typeof sql === 'string' && sql.includes('FROM ciudades')) {
+          return [[{ id_ciudad: 1, nombre: 'Viale', provincia: 'Entre Ríos', activa: 1 }]];
+        }
+        if (typeof sql === 'string' && sql.includes('FROM categorias')) {
+          return [[{ id: 1, nombre: 'Bacheo', estado: 'activo', tipo: 'reclamo' }]];
+        }
+        if (typeof sql === 'string' && sql.includes('COUNT(*) AS total FROM reclamos')) {
+          return [[{ total: 0 }]];
+        }
+        // Ninguna institución especializada ni principal válida
+        if (typeof sql === 'string' && sql.includes('FROM instituciones i')) {
+          return [[]];
+        }
+        return [[]];
+      });
+
+      const res = await request(app)
+        .post('/api/reclamos')
+        .set('Authorization', `Bearer ${citizenToken}`)
+        .send({
+          titulo: 'Bache en calle céntrica',
+          descripcion: 'Bache profundo frente a la plaza',
+          id_categoria: 1,
+          direccion: 'Av. San Martín 120',
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.mensaje).toMatch(/no cuenta actualmente con una institución principal o responsable/i);
+    });
+  });
 });

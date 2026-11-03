@@ -236,6 +236,18 @@ const userController = {
       const filas = await UserModel.updateRol(id, nuevoRol);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
 
+      try {
+        const AuditoriaModel = require('../../admin/auditoriaModel');
+        await AuditoriaModel.registrar({
+          idActor: req.user?.id || null,
+          entidadTipo: 'usuario',
+          entidadId: Number(id),
+          accion: 'CAMBIAR_ROL_USUARIO',
+          datosPrevios: { rol: rolActual },
+          datosNuevos: { rol: nuevoRol },
+        });
+      } catch (_) {}
+
       // Revocar refresh tokens activos al cambiar el rol para impedir renovación con permisos obsoletos
       try {
         const RefreshTokenModel = require('../models/refreshTokenModel');
@@ -252,7 +264,7 @@ const userController = {
   async cambiarEstado(req, res, next) {
     try {
       const { id } = req.params;
-      let { estado, activo } = req.body;
+      let { estado, activo, motivo } = req.body;
 
       if (activo !== undefined && estado === undefined) {
         estado = (activo === true || activo === 1 || activo === '1') ? 'activo' : 'inactivo';
@@ -277,6 +289,19 @@ const userController = {
 
       const filas = await UserModel.setEstado(id, !esInactivo);
       if (filas === 0) return res.status(404).json({ ok: false, mensaje: 'Usuario no encontrado' });
+
+      try {
+        const AuditoriaModel = require('../../admin/auditoriaModel');
+        await AuditoriaModel.registrar({
+          idActor: req.user?.id || null,
+          entidadTipo: 'usuario',
+          entidadId: Number(id),
+          accion: esInactivo ? 'INHABILITAR_USUARIO' : 'REHABILITAR_USUARIO',
+          motivo: motivo ? String(motivo).trim() : null,
+          datosPrevios: { estado: usuarioExistente.estado },
+          datosNuevos: { estado: nuevoEstado },
+        });
+      } catch (_) {}
 
       // Si se inhabilita, revocar refresh tokens
       if (esInactivo) {
