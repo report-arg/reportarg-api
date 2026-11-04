@@ -68,6 +68,7 @@ npm test
 - Escribí siempre en español los comentarios de código, mensajes de commit, descripciones de PR, respuestas, documentación y cualquier otra redacción.
 - Conservá en inglés los nombres técnicos, APIs, comandos, archivos e identificadores cuando lo requiera la tecnología o sea la convención existente del proyecto. No renombres elementos solo para traducirlos.
 - Explicá las decisiones relevantes y las limitaciones con lenguaje claro. Distinguí lo implementado, lo verificado y lo pendiente.
+- **Prohibición estricta en respuestas hacia la UI:** **NUNCA** incluyas identificadores de tickets (ej. `ADMIN-01`, `CITY-01`, `CITY04–CITY05`, `HU-xx`), sprints ni etapas internas de desarrollo en mensajes de respuesta (`mensaje` / `error`) destinados a mostrarse en la interfaz de usuario. Explicá siempre la regla o motivo en lenguaje funcional de producto.
 
 ## Documentación
 

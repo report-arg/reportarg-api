@@ -54,7 +54,7 @@ const UserModel = {
 
   // Listar todos con filtros opcionales y paginación
   async getAll({ busqueda, rol, estado, pagina = 1, limite = 20 } = {}) {
-    let where = 'WHERE 1=1';
+    let where = 'WHERE COALESCE(u.email_verified, 1) = 1';
     const params = [];
 
     if (busqueda) {
@@ -132,26 +132,34 @@ const UserModel = {
         u.fecha_creacion,
         COALESCE(
           CONCAT(c.nombre, ' ', c.apellido),
-          i.nombre
+          inst.nombre
         ) AS nombre,
         c.nombre AS nombre_ciudadano,
         c.apellido,
-        COALESCE(c.provincia, i.provincia) AS provincia,
-        COALESCE(c.ciudad, i.ciudad) AS ciudad,
-        COALESCE(c.zona, i.zona) AS zona,
+        COALESCE(c.provincia, inst.provincia) AS provincia,
+        COALESCE(c.ciudad, inst.ciudad) AS ciudad,
+        COALESCE(c.zona, inst.zona) AS zona,
         c.provincia AS provincia_declarada,
         c.ciudad AS ciudad_declarada,
         CASE WHEN ciud.activa = 1 THEN ciud.nombre ELSE NULL END AS ciudad_activa,
         CASE WHEN ciud.activa = 1 THEN ciud.provincia ELSE NULL END AS provincia_activa,
         COALESCE(ciud.activa, 0) AS residencia_activa,
-        i.telefono,
-        i.direccion,
-        i.tipo,
-        COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
+        inst.id_institucion,
+        inst.verificada AS institucion_verificada,
+        inst.status AS institucion_status,
+        inst.motivo_rechazo,
+        inst.fecha_rechazo,
+        inst.cuit,
+        inst.nombre_contacto,
+        inst.es_principal,
+        inst.telefono,
+        inst.direccion,
+        inst.tipo,
+        COALESCE(c.foto_perfil, inst.foto_perfil) AS foto,
         (SELECT COUNT(*) FROM reclamos r WHERE r.id_usuario = u.id_usuario) AS reportes
       FROM usuarios u
       LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
-      LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
+      LEFT JOIN instituciones inst ON inst.id_usuario = u.id_usuario
       LEFT JOIN ciudades ciud ON ciud.id_ciudad = u.id_ciudad
       WHERE u.id_usuario = ?
     `, [id]);

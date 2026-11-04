@@ -354,10 +354,31 @@ Al trabajar sobre `ADMIN-01`:
   - Validación en `ReclamoModel.reasignarInstitucion` para permitir reasignar únicamente a instituciones verificadas, aprobadas y con usuario activo.
 - **Pruebas:** 19 suites y 229 tests pasando (`npm test`), incluyendo nuevas pruebas de seguridad, auditoría, reasignación y ciclo institucional.
 
+## Etapa 2 — Ciclo de Vida de Instituciones y Bandeja de Solicitudes (Completada)
+
+- **Rama (`reportarg-api` y `report-arg`):** `feature/ADMIN-01-reglas-negocio`
+- **Backend (`reportarg-api`):**
+  - **Suspensión y rehabilitación de instituciones verificadas (`PATCH /api/admin/instituciones/:id/estado`):**
+    - Bloqueo estricto (`409 INSTITUCION_PRINCIPAL_PROTEGIDA`) si se intenta suspender la institución principal (`es_principal = 1`) de una ciudad activa.
+    - Reasignación automática en transacción atómica de todos los reclamos abiertos (`Pendiente`, `En revisión`, `En proceso`) a la institución principal de la ciudad cuando se suspende una institución especializada, dejando trazabilidad en `reclamos_historial` y `admin_auditoria`.
+  - **Gestión de categorías autorizadas e institución principal (`GET/PUT /api/admin/instituciones/:id/categorias`, `PUT /api/admin/instituciones/:id/principal`):**
+    - Asignación transaccional de categorías en `institucion_categorias` verificando que otra institución activa de la misma ciudad no posea ya la misma categoría (`409`).
+    - Exposición de `categorias` en `InstitutionModel.getAll` y `getById`, y desglose completo de métricas en `getStats` (`total`, `verificadas`, `pendientes`, `rechazadas`, `suspendidas`).
+  - **Ventana de 7 días para cuentas institucionales no verificadas / rechazadas:**
+    - `PUT /api/auth/me/institucion-solicitud`: permite a la institución pendiente o rechazada corregir sus datos (`nombre`, `tipo`, `cuit`, `nombre_contacto`, `telefono`, `direccion`) y reenviar la solicitud a estado `pending`, limpiando `motivo_rechazo` y `fecha_rechazo` y registrando el evento en `admin_auditoria`.
+    - `POST /api/auth/me/convertir-a-ciudadano`: permite convertir la misma cuenta (`id_usuario`, sin colisión de `email`) en una cuenta de `ciudadano` ingresando `nombre` y `apellido` personal, creando el perfil en `ciudadanos`, eliminando la solicitud institucional no verificada y emitiendo nuevos tokens JWT con rol `ciudadano`.
+- **Frontend (`report-arg`):**
+  - Actualización de `useInstituciones.js`, `InstitucionStatsCards.jsx`, `InstitucionFilterBar.jsx`, `InstitucionTable.jsx`, `InstitucionDetailModal.jsx`, `InstitucionRejectModal.jsx` y nuevo `InstitucionStatusModal.jsx` utilizando los componentes reutilizables de `@/components/ui/` (`Button`, `Select`, `Input`, `Textarea`, `Modal`, `ConfirmModal`, `Badge`).
+  - Incorporación en `/admin/institutions` de filtro por ciudad, pestaña de instituciones `Suspendidas`, insignia de `Institución Principal`, configuración de categorías asignadas, designación de institución principal y suspensión/rehabilitación operativa.
+  - Estructuración de `/admin/solicitudes` por tipo de solicitud (`Verificación de Instituciones` con vistas de pendientes y rechazadas, `Activación de Ciudades` y `Operaciones y Categorías`).
+  - Implementación de `InstitucionEstadoSolicitudView.jsx` en `/institucion` para cuentas con `verificada = 0`, mostrando estado "Pendiente de verificación" o "Solicitud institucional rechazada" con el `motivo_rechazo`, alerta de cierre en 7 días, modal para corregir y reenviar solicitud institucional y modal para convertir la cuenta a Ciudadano conservando el correo electrónico.
+- **Pruebas:**
+  - `reportarg-api`: 19 suites y 233 tests pasando (`npm test`).
+  - `report-arg`: 8 suites y 49 tests pasando (`npm test -- --runInBand`).
+
 ## Próximas etapas planificadas
 
-- **Etapa 2 (Siguiente):** Ciclo de vida de instituciones (suspensión/rehabilitación con protección de institución principal y reasignación automática de reclamos abiertos, gestión de `institucion_categorias`, endpoints de reenvío de solicitud o conversión a ciudadano dentro de los 7 días) y actualización de `/admin/institutions`, `/admin/solicitudes` y pantalla de estado en `/institucion` (`report-arg`).
-- **Etapa 3:** Gestión administrativa de ciudades (`/admin/ciudades`, ciudades activas/inactivas, designación de institución principal única y validaciones de activación/desactivación).
+- **Etapa 3 (Siguiente):** Gestión administrativa de ciudades (`/admin/ciudades`, ciudades activas/inactivas, designación de institución principal única y validaciones de activación/desactivación).
 - **Etapa 4:** Supervisión de reclamos (filtros completos y anomalías de asignación en `/admin/reclamos`), cobertura institucional en `/admin/categories` y retiro de `/admin/reclamos/nuevo` + modal selector de ciudad para el admin al ingresar a `/ciudadano`.
 - **Etapa 5:** Gestión de usuarios (`/admin/users` con ciudad y conteo de reclamos, alta corregida, retiro de edición manual) y estandarización de controles UI (`@/components/ui`).
 - **Etapa 6:** Rediseño del Dashboard administrativo (`/admin`) centrado en pendientes y salud de plataforma.

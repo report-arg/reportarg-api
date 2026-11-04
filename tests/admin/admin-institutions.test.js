@@ -112,17 +112,23 @@ describe('M贸dulo de Administraci贸n de Instituciones y Solicitudes (ADMIN-01 鈥
   });
 
   describe('2. Estad铆sticas Institucionales (GET /api/admin/instituciones/stats)', () => {
-    test('devuelve conteo total, verificadas y pendientes', async () => {
+    test('devuelve conteo total, verificadas, pendientes, rechazadas y suspendidas', async () => {
       mockDbQuery({
         extra: (sql) => {
-          if (typeof sql === 'string' && sql.includes('COUNT(*) AS total FROM instituciones WHERE verificada = 1')) {
+          if (typeof sql === 'string' && sql.includes('WHERE i.verificada = 1 AND u.activo = 0')) {
+            return [[{ total: 1 }]];
+          }
+          if (typeof sql === 'string' && sql.includes("status = 'rejected'")) {
+            return [[{ total: 2 }]];
+          }
+          if (typeof sql === 'string' && sql.includes('i.verificada = 1')) {
             return [[{ total: 10 }]];
           }
-          if (typeof sql === 'string' && sql.includes('COUNT(*) AS total FROM instituciones WHERE verificada = 0')) {
+          if (typeof sql === 'string' && sql.includes('i.verificada = 0')) {
             return [[{ total: 3 }]];
           }
           if (typeof sql === 'string' && sql.includes('COUNT(*) AS total FROM instituciones')) {
-            return [[{ total: 13 }]];
+            return [[{ total: 15 }]];
           }
           return [[]];
         },
@@ -135,9 +141,11 @@ describe('M贸dulo de Administraci贸n de Instituciones y Solicitudes (ADMIN-01 鈥
       expect(res.status).toBe(200);
       expect(res.body.ok).toBe(true);
       expect(res.body.data).toEqual({
-        total: 13,
+        total: 15,
         verificadas: 10,
         pendientes: 3,
+        rechazadas: 2,
+        suspendidas: 1,
       });
     });
   });
@@ -349,6 +357,206 @@ describe('M贸dulo de Administraci贸n de Instituciones y Solicitudes (ADMIN-01 鈥
       expect(res.body.ok).toBe(true);
       expect(res.body.data).toHaveLength(1);
       expect(res.body.data[0].accion).toBe('RECHAZAR_INSTITUCION');
+    });
+  });
+
+  describe('7. Suspensi贸n, Categor铆as y Flujo de Ventana de 7 D铆as (Etapa 2)', () => {
+    test('bloquea suspender una instituci贸n principal de una ciudad activa (409)', async () => {
+      mockDbQuery({});
+      db.getConnection.mockResolvedValueOnce({
+        query: jest.fn(async (sql) => {
+          if (sql.includes('FROM instituciones i') && sql.includes('FOR UPDATE')) {
+            return [[{
+              id_institucion: 1,
+              id_usuario: 10,
+              id_ciudad: 1,
+              nombre: 'Municipalidad de Viale',
+              verificada: 1,
+              status: 'approved',
+              es_principal: 1,
+              usuario_activo: 1,
+              ciudad_activa: 1,
+            }]];
+          }
+          return [[]];
+        }),
+        beginTransaction: jest.fn(),
+        commit: jest.fn(),
+        rollback: jest.fn(),
+        release: jest.fn(),
+      });
+
+      const res = await request(app)
+        .patch('/api/admin/instituciones/1/estado')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ activo: false, motivo: 'Intento de suspender instituci贸n principal' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.codigo).toBe('INSTITUCION_PRINCIPAL_PROTEGIDA');
+    });
+
+    test('al suspender una instituci贸n especializada, reasigna sus reclamos abiertos a la instituci贸n principal', async () => {
+      mockDbQuery({});
+      let reclamosUpdated = false;
+      let historialInserted = false;
+
+      db.getConnection.mockResolvedValueOnce({
+        query: jest.fn(async (sql) => {
+          if (sql.includes('FROM instituciones i') && sql.includes('FOR UPDATE')) {
+            return [[{
+              id_institucion: 4,
+              id_usuario: 14,
+              id_ciudad: 1,
+              nombre: 'Enersa Viale',
+              verificada: 1,
+              status: 'approved',
+              es_principal: 0,
+              usuario_activo: 1,
+              ciudad_activa: 1,
+            }]];
+          }
+          if (sql.includes('FROM reclamos') && sql.includes('FOR UPDATE')) {
+            return [[
+              { id_reclamo: 50, estado: 'Pendiente', titulo: 'Corte de luz', id_usuario: 2 },
+            ]];
+          }
+          if (sql.includes('AND i.es_principal = 1')) {
+            return [[{ id_institucion: 1, nombre: 'Municipalidad de Viale' }]];
+          }
+          if (sql.includes('UPDATE reclamos')) {
+            reclamosUpdated = true;
+            return [{ affectedRows: 1 }];
+          }
+          if (sql.includes('INSERT INTO reclamos_historial')) {
+            historialInserted = true;
+            return [{ insertId: 1 }];
+          }
+          return [{ affectedRows: 1 }];
+        }),
+        beginTransaction: jest.fn(),
+        commit: jest.fn(),
+        rollback: jest.fn(),
+        release: jest.fn(),
+      });
+
+      const res = await request(app)
+        .patch('/api/admin/instituciones/4/estado')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ activo: false, motivo: 'Baja operativa temporal por convenio' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data.reclamos_reasignados).toBe(1);
+      expect(reclamosUpdated).toBe(true);
+      expect(historialInserted).toBe(true);
+    });
+
+    test('permite a una instituci贸n rechazada reenviar su solicitud corregida y pasar nuevamente a pending', async () => {
+      const instUserToken = generateTestToken(ROLES.INSTITUCION, 80);
+      mockDbQuery({
+        authUser: {
+          id_usuario: 80,
+          email: 'rechazada@test.org',
+          activo: 1,
+          tipo_usuario: 'institucion',
+          id_ciudad: 1,
+          id_institucion: 8,
+          institucion_verificada: 0,
+          institucion_status: 'rejected',
+          fecha_rechazo: new Date().toISOString(),
+        },
+      });
+
+      db.getConnection.mockResolvedValueOnce({
+        query: jest.fn(async (sql) => {
+          if (sql.includes('FROM instituciones') && sql.includes('FOR UPDATE')) {
+            return [[{
+              id_institucion: 8,
+              id_usuario: 80,
+              nombre: 'ONG Local',
+              tipo: 'social',
+              verificada: 0,
+              status: 'rejected',
+              motivo_rechazo: 'CUIT incorrecto',
+            }]];
+          }
+          return [{ affectedRows: 1 }];
+        }),
+        beginTransaction: jest.fn(),
+        commit: jest.fn(),
+        rollback: jest.fn(),
+        release: jest.fn(),
+      });
+
+      const res = await request(app)
+        .put('/api/auth/me/institucion-solicitud')
+        .set('Authorization', `Bearer ${instUserToken}`)
+        .send({
+          nombre: 'ONG Local Viale',
+          tipo: 'social',
+          cuit: '30-12345678-9',
+          nombre_contacto: 'Mar铆a G贸mez',
+          telefono: '3434000000',
+          direccion: 'Av. San Mart铆n 450',
+          zona: 'Centro',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data.status).toBe('pending');
+    });
+
+    test('permite a una cuenta institucional no verificada convertirse a ciudadano conservando su email', async () => {
+      const instUserToken = generateTestToken(ROLES.INSTITUCION, 81);
+      mockDbQuery({
+        authUser: {
+          id_usuario: 81,
+          email: 'persona@test.com',
+          activo: 1,
+          tipo_usuario: 'institucion',
+          id_ciudad: 1,
+          id_institucion: 9,
+          institucion_verificada: 0,
+          institucion_status: 'rejected',
+          fecha_rechazo: new Date().toISOString(),
+        },
+      });
+
+      db.getConnection.mockResolvedValueOnce({
+        query: jest.fn(async (sql) => {
+          if (sql.includes('FROM instituciones') && sql.includes('FOR UPDATE')) {
+            return [[{
+              id_institucion: 9,
+              id_usuario: 81,
+              nombre: 'Registro Err贸neo',
+              provincia: 'Entre R铆os',
+              ciudad: 'Viale',
+              zona: 'Centro',
+              verificada: 0,
+              status: 'rejected',
+            }]];
+          }
+          return [{ affectedRows: 1 }];
+        }),
+        beginTransaction: jest.fn(),
+        commit: jest.fn(),
+        rollback: jest.fn(),
+        release: jest.fn(),
+      });
+
+      const res = await request(app)
+        .post('/api/auth/me/convertir-a-ciudadano')
+        .set('Authorization', `Bearer ${instUserToken}`)
+        .send({
+          nombre: 'Juan',
+          apellido: 'P茅rez',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.user.role).toBe('ciudadano');
+      expect(res.body.user.nombre).toBe('Juan P茅rez');
+      expect(res.body.accessToken).toBeDefined();
     });
   });
 });

@@ -208,7 +208,12 @@ const authService = {
 
   async registerCitizen({ nombre, apellido, email, password, provincia, ciudad, zona }) {
     const existingUser = await this.findUserByEmail(email);
-    if (existingUser) throwError(400, 'El email ya está registrado');
+    const isUnverifiedDraft =
+      existingUser &&
+      (existingUser.email_verified === 0 || existingUser.email_verified === false);
+    if (existingUser && !isUnverifiedDraft) {
+      throwError(400, 'El email ya está registrado');
+    }
 
     const nombreClean = String(nombre || '').trim();
     const apellidoClean = String(apellido || '').trim();
@@ -242,17 +247,31 @@ const authService = {
         }
       }
 
-      const userId = await UserModel.createAuthUser(connection, {
-        email: emailClean,
-        password: hashedPassword,
-        email_verified: false,
-        verification_code: otp,
-        verification_expires: expiresAt,
-        auth_provider: 'local',
-        activo: true,
-        id_ciudad: idCiudadActiva || null,
-        tipo_usuario: ROLES.CIUDADANO
-      });
+      let userId;
+      if (isUnverifiedDraft) {
+        userId = resolveUserId(existingUser);
+        await connection.query(
+          `UPDATE usuarios
+           SET password = ?, verification_code = ?, verification_expires = ?,
+               activo = 1, id_ciudad = ?, tipo_usuario = ?
+           WHERE id_usuario = ?`,
+          [hashedPassword, otp, expiresAt, idCiudadActiva || null, ROLES.CIUDADANO, userId]
+        );
+        await connection.query('DELETE FROM instituciones WHERE id_usuario = ?', [userId]);
+        await connection.query('DELETE FROM ciudadanos WHERE id_usuario = ?', [userId]);
+      } else {
+        userId = await UserModel.createAuthUser(connection, {
+          email: emailClean,
+          password: hashedPassword,
+          email_verified: false,
+          verification_code: otp,
+          verification_expires: expiresAt,
+          auth_provider: 'local',
+          activo: true,
+          id_ciudad: idCiudadActiva || null,
+          tipo_usuario: ROLES.CIUDADANO
+        });
+      }
 
       await CiudadanoModel.create(connection, {
         id_usuario: userId,
@@ -287,7 +306,12 @@ const authService = {
 
   async registerInstitution({ contactName, email, password, institutionName, cuit, institutionType, phone, provincia, ciudad, zona, address }) {
     const existingUser = await this.findUserByEmail(email);
-    if (existingUser) throwError(400, 'El email ya está registrado');
+    const isUnverifiedDraft =
+      existingUser &&
+      (existingUser.email_verified === 0 || existingUser.email_verified === false);
+    if (existingUser && !isUnverifiedDraft) {
+      throwError(400, 'El email ya está registrado');
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const otp = generateOTP();
@@ -304,17 +328,31 @@ const authService = {
         throwError(400, 'La ciudad o localidad indicada no cuenta actualmente con la plataforma ReportARG activa para dar de alta instituciones.');
       }
 
-      const userId = await UserModel.createAuthUser(connection, {
-        email,
-        password: hashedPassword,
-        email_verified: false,
-        verification_code: otp,
-        verification_expires: expiresAt,
-        auth_provider: 'local',
-        activo: true,
-        id_ciudad: idCiudadActiva,
-        tipo_usuario: ROLES.INSTITUCION
-      });
+      let userId;
+      if (isUnverifiedDraft) {
+        userId = resolveUserId(existingUser);
+        await connection.query(
+          `UPDATE usuarios
+           SET password = ?, verification_code = ?, verification_expires = ?,
+               activo = 1, id_ciudad = ?, tipo_usuario = ?
+           WHERE id_usuario = ?`,
+          [hashedPassword, otp, expiresAt, idCiudadActiva, ROLES.INSTITUCION, userId]
+        );
+        await connection.query('DELETE FROM ciudadanos WHERE id_usuario = ?', [userId]);
+        await connection.query('DELETE FROM instituciones WHERE id_usuario = ?', [userId]);
+      } else {
+        userId = await UserModel.createAuthUser(connection, {
+          email,
+          password: hashedPassword,
+          email_verified: false,
+          verification_code: otp,
+          verification_expires: expiresAt,
+          auth_provider: 'local',
+          activo: true,
+          id_ciudad: idCiudadActiva,
+          tipo_usuario: ROLES.INSTITUCION
+        });
+      }
 
       await InstitutionModel.create(connection, {
         id_usuario: userId,
@@ -382,7 +420,9 @@ const authService = {
     const user = await this.findUserByEmail(String(email).trim());
     if (!user) throwError(401, 'Credenciales inválidas');
     if (!user.activo) throwError(403, 'Cuenta deshabilitada', 'CUENTA_DESHABILITADA');
-    if (!user.email_verified) throwError(403, 'Debes verificar tu cuenta antes de iniciar sesión');
+    if (!user.email_verified) {
+      throwError(403, 'Debes verificar tu cuenta antes de iniciar sesión', 'EMAIL_NO_VERIFICADO');
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throwError(401, 'Credenciales inválidas');
@@ -742,7 +782,71 @@ const authService = {
       id_ciudad_residencia: idCiudadResidencia || null,
       permisos_escritura: esResidencia,
     };
-  }
+  },
+
+  async reenviarSolicitudInstitucion(userId, role, institucionVerificada, payload) {
+    if (normalizeRole(role) !== ROLES.INSTITUCION) {
+      throwError(403, 'Esta acción solo está disponible para cuentas institucionales', 'ROL_NO_AUTORIZADO');
+    }
+    if (institucionVerificada) {
+      throwError(409, 'La institución ya se encuentra verificada', 'INSTITUCION_YA_VERIFICADA');
+    }
+
+    const { nombre, tipo, cuit, nombre_contacto, telefono, direccion, zona } = payload || {};
+    if (!nombre || !String(nombre).trim()) {
+      throwError(400, 'El nombre de la institución es obligatorio para actualizar la solicitud');
+    }
+
+    return await InstitutionModel.reenviarSolicitudPorUsuario(userId, {
+      nombre,
+      tipo,
+      cuit,
+      nombre_contacto,
+      telefono,
+      direccion,
+      zona,
+    });
+  },
+
+  async convertirInstitucionACiudadano(userId, email, role, institucionVerificada, payload) {
+    if (normalizeRole(role) !== ROLES.INSTITUCION) {
+      throwError(403, 'Esta acción solo está disponible para cuentas institucionales no verificadas', 'ROL_NO_AUTORIZADO');
+    }
+    if (institucionVerificada) {
+      throwError(409, 'No se puede convertir a ciudadano una institución que ya fue verificada', 'INSTITUCION_YA_VERIFICADA');
+    }
+
+    const { nombre, apellido, provincia, ciudad, zona } = payload || {};
+    if (!nombre || !String(nombre).trim() || !apellido || !String(apellido).trim()) {
+      throwError(400, 'Nombre y apellido son obligatorios para convertir la cuenta a ciudadano');
+    }
+
+    const perfilCiudadano = await InstitutionModel.convertirACiudadanoPorUsuario(userId, {
+      nombre,
+      apellido,
+      provincia,
+      ciudad,
+      zona,
+    });
+
+    await RefreshTokenModel.deleteByUserId(userId);
+    const { accessToken, refreshToken } = this.createTokens(userId, email, ROLES.CIUDADANO);
+    await this.saveRefreshToken(refreshToken, userId, ROLES.CIUDADANO);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: userId,
+        email,
+        role: ROLES.CIUDADANO,
+        nombre: perfilCiudadano.nombre,
+        provincia: perfilCiudadano.provincia,
+        ciudad: perfilCiudadano.ciudad,
+        zona: perfilCiudadano.zona,
+      },
+    };
+  },
 };
 
 module.exports = authService;

@@ -11,6 +11,8 @@ router.get('/me/ciudades-interes', verifyToken, authController.getCiudadesIntere
 router.post('/me/ciudades-interes', verifyToken, authController.addCiudadInteres);
 router.delete('/me/ciudades-interes/:idCiudad', verifyToken, authController.removeCiudadInteres);
 router.post('/me/contexto-ciudad', verifyToken, authController.cambiarContextoCiudad);
+router.put('/me/institucion-solicitud', verifyToken, authController.reenviarSolicitudInstitucion);
+router.post('/me/convertir-a-ciudadano', verifyToken, authController.convertirACiudadano);
 
 router.post('/register-citizen', authController.registerCitizen);
 router.post('/register-institution', authController.registerInstitution);

@@ -248,23 +248,29 @@ const me = async (req, res, next) => {
       }
     }
 
+    const payloadPerfil = {
+      ...usuario,
+      rol: req.user.role,
+      id_ciudad: residenciaActiva ? (req.user.id_ciudad ?? usuario.id_ciudad ?? null) : null,
+      residencia_activa: residenciaActiva,
+      ciudad_residencia: {
+        id: residenciaActiva ? (req.user.id_ciudad ?? usuario.id_ciudad ?? null) : null,
+        nombre: nombreResidencia,
+        provincia: provinciaResidencia,
+        activa: residenciaActiva,
+      },
+      ciudades_interes: ciudadesInteres,
+      id_institucion: req.user.id_institucion ?? usuario.id_institucion ?? null,
+      institucion_verificada:
+        req.user.institucion_verificada !== undefined
+          ? req.user.institucion_verificada
+          : Boolean(usuario.institucion_verificada),
+    };
+
     return res.json({
       ok: true,
-      data: {
-        ...usuario,
-        rol: req.user.role,
-        id_ciudad: residenciaActiva ? (req.user.id_ciudad ?? usuario.id_ciudad ?? null) : null,
-        residencia_activa: residenciaActiva,
-        ciudad_residencia: {
-          id: residenciaActiva ? (req.user.id_ciudad ?? usuario.id_ciudad ?? null) : null,
-          nombre: nombreResidencia,
-          provincia: provinciaResidencia,
-          activa: residenciaActiva,
-        },
-        ciudades_interes: ciudadesInteres,
-        id_institucion: req.user.id_institucion ?? usuario.id_institucion ?? null,
-        institucion_verificada: req.user.institucion_verificada,
-      },
+      data: payloadPerfil,
+      user: payloadPerfil,
     });
   } catch (error) {
     next(error);
@@ -364,6 +370,59 @@ const cambiarContextoCiudad = async (req, res, next) => {
   }
 };
 
+const reenviarSolicitudInstitucion = async (req, res, next) => {
+  try {
+    const data = await authService.reenviarSolicitudInstitucion(
+      req.user.id,
+      req.user.role,
+      req.user.institucion_verificada,
+      req.body
+    );
+    return res.json({
+      ok: true,
+      mensaje: 'Solicitud institucional actualizada y reenviada para revisión administrativa.',
+      data,
+    });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        ok: false,
+        mensaje: error.message,
+        error: error.message,
+        ...(error.codigo ? { codigo: error.codigo } : {}),
+      });
+    }
+    next(error);
+  }
+};
+
+const convertirACiudadano = async (req, res, next) => {
+  try {
+    const result = await authService.convertirInstitucionACiudadano(
+      req.user.id,
+      req.user.email,
+      req.user.role,
+      req.user.institucion_verificada,
+      req.body
+    );
+    return res.json({
+      ok: true,
+      mensaje: 'Tu cuenta fue convertida a ciudadano exitosamente.',
+      ...result,
+    });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        ok: false,
+        mensaje: error.message,
+        error: error.message,
+        ...(error.codigo ? { codigo: error.codigo } : {}),
+      });
+    }
+    next(error);
+  }
+};
+
 module.exports = {
   registerCitizen,
   registerInstitution,
@@ -380,4 +439,6 @@ module.exports = {
   addCiudadInteres,
   removeCiudadInteres,
   cambiarContextoCiudad,
+  reenviarSolicitudInstitucion,
+  convertirACiudadano,
 };
