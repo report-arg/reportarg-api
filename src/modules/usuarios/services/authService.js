@@ -321,12 +321,18 @@ const authService = {
     await connection.beginTransaction();
 
     try {
-      const idCiudadActiva = await cityService.findActiveCity(ciudad, provincia, connection);
+      const ciudadRes = await cityService.findOrCreateCity(ciudad, provincia, connection);
 
-      if (!idCiudadActiva) {
+      if (!ciudadRes || !ciudadRes.id_ciudad) {
         await connection.rollback();
-        throwError(400, 'La ciudad o localidad indicada no cuenta actualmente con la plataforma ReportARG activa para dar de alta instituciones.');
+        throwError(
+          400,
+          'La ciudad o localidad indicada no pertenece al padrón oficial para la provincia seleccionada.',
+          'CIUDAD_INEXISTENTE'
+        );
       }
+
+      const idCiudadAsignada = ciudadRes.id_ciudad;
 
       let userId;
       if (isUnverifiedDraft) {
@@ -336,7 +342,7 @@ const authService = {
            SET password = ?, verification_code = ?, verification_expires = ?,
                activo = 1, id_ciudad = ?, tipo_usuario = ?
            WHERE id_usuario = ?`,
-          [hashedPassword, otp, expiresAt, idCiudadActiva, ROLES.INSTITUCION, userId]
+          [hashedPassword, otp, expiresAt, idCiudadAsignada, ROLES.INSTITUCION, userId]
         );
         await connection.query('DELETE FROM ciudadanos WHERE id_usuario = ?', [userId]);
         await connection.query('DELETE FROM instituciones WHERE id_usuario = ?', [userId]);
@@ -349,7 +355,7 @@ const authService = {
           verification_expires: expiresAt,
           auth_provider: 'local',
           activo: true,
-          id_ciudad: idCiudadActiva,
+          id_ciudad: idCiudadAsignada,
           tipo_usuario: ROLES.INSTITUCION
         });
       }
@@ -366,7 +372,7 @@ const authService = {
         zona,
         direccion: address,
         status: 'pending',
-        id_ciudad: idCiudadActiva
+        id_ciudad: idCiudadAsignada
       });
 
       await connection.commit();

@@ -376,10 +376,28 @@ Al trabajar sobre `ADMIN-01`:
   - `reportarg-api`: 19 suites y 233 tests pasando (`npm test`).
   - `report-arg`: 8 suites y 49 tests pasando (`npm test -- --runInBand`).
 
+## Etapa 3 — Gestión Administrativa de Ciudades (Completada)
+
+- **Rama (`reportarg-api` y `report-arg`):** `feature/ADMIN-01-reglas-negocio`
+- **Backend (`reportarg-api`):**
+  - **Listado y métricas administrativas (`GET /api/admin/ciudades`, `GET /api/admin/ciudades/stats`):**
+    - Devuelve todas las ciudades registradas (activas e inactivas), su institución principal vigente (`id_institucion_principal`, `institucion_principal_nombre`), el listado de instituciones verificadas y activas elegibles por ciudad (`instituciones_elegibles`) y contadores operativos (`instituciones_verificadas`, `instituciones_pendientes`, `ciudadanos_total`, `reclamos_total`, `reclamos_abiertos`), conservando el contrato público de `GET /api/ciudades` restringido a ciudades activas.
+  - **Registro de nuevas localidades (`POST /api/admin/ciudades`) y registro institucional en localidades inactivas (`findOrCreateCity`):**
+    - Permite al administrador registrar en `ciudades` cualquier localidad del padrón oficial argentino en estado `inactiva` (`activa = 0`) con trazabilidad en `admin_auditoria`.
+    - Permite que las instituciones se registren en localidades oficiales aún inactivas para que el administrador pueda verificarlas, designar la institución principal y activar la ciudad.
+  - **Activación y desactivación operativa (`PATCH /api/admin/ciudades/:id/estado`) y designación de institución principal (`PUT /api/admin/ciudades/:id/institucion-principal`):**
+    - Bloquea la activación de cualquier ciudad que no cuente con una institución principal verificada y activa (`409 CIUDAD_SIN_INSTITUCION_PRINCIPAL`).
+    - Permite seleccionar la institución principal dentro de la misma transacción de activación, vinculando automáticamente a los ciudadanos residentes con `id_ciudad = NULL` y registrando la auditoría (`ACTIVAR_CIUDAD`).
+    - Exige motivo obligatorio al desactivar una ciudad (`400 MOTIVO_OBLIGATORIO`) y registra el evento en `admin_auditoria` (`DESACTIVAR_CIUDAD`).
+- **Frontend (`report-arg`):**
+  - Rediseño funcional completo de `/admin/ciudades` (`src/app/admin/ciudades/page.js`) con tarjetas de métricas territoriales, filtros por estado (`Todas`, `Activas`, `Inactivas`, `Sin Institución Principal`), provincia y búsqueda, tabla con institución principal y actividad por localidad, y modales estandarizados (`ConfirmModal`, `Select`, `Textarea`, `Combobox`) para registrar localidades, designar/cambiar la institución principal y activar/desactivar ciudades.
+- **Pruebas:**
+  - `reportarg-api`: 20 suites y 243 tests pasando (`npm test`).
+  - `report-arg`: 8 suites y 50 tests pasando (`npm test -- --runInBand`).
+
 ## Próximas etapas planificadas
 
-- **Etapa 3 (Siguiente):** Gestión administrativa de ciudades (`/admin/ciudades`, ciudades activas/inactivas, designación de institución principal única y validaciones de activación/desactivación).
-- **Etapa 4:** Supervisión de reclamos (filtros completos y anomalías de asignación en `/admin/reclamos`), cobertura institucional en `/admin/categories` y retiro de `/admin/reclamos/nuevo` + modal selector de ciudad para el admin al ingresar a `/ciudadano`.
+- **Etapa 4 (Siguiente):** Supervisión de reclamos (filtros completos y anomalías de asignación en `/admin/reclamos`), cobertura institucional en `/admin/categories` y retiro de `/admin/reclamos/nuevo` + modal selector de ciudad para el admin al ingresar a `/ciudadano`.
 - **Etapa 5:** Gestión de usuarios (`/admin/users` con ciudad y conteo de reclamos, alta corregida, retiro de edición manual) y estandarización de controles UI (`@/components/ui`).
 - **Etapa 6:** Rediseño del Dashboard administrativo (`/admin`) centrado en pendientes y salud de plataforma.
 
