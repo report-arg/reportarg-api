@@ -93,8 +93,14 @@ const UserModel = {
           i.nombre
         ) AS nombre,
         COALESCE(c.foto_perfil, i.foto_perfil) AS foto,
+        COALESCE(ciud.nombre, c.ciudad, i.ciudad) AS ciudad_nombre,
+        COALESCE(ciud.provincia, c.provincia, i.provincia) AS provincia_nombre,
         ciud.nombre AS ciudad_activa,
-        ciud.provincia AS provincia_activa
+        ciud.provincia AS provincia_activa,
+        COALESCE(c.ciudad, i.ciudad) AS ciudad_declarada,
+        COALESCE(c.provincia, i.provincia) AS provincia_declarada,
+        (SELECT COUNT(*) FROM reclamos r WHERE r.id_usuario = u.id_usuario) AS reclamos_total,
+        (SELECT COUNT(*) FROM reclamos r WHERE r.id_usuario = u.id_usuario) AS reportes
       FROM usuarios u
       LEFT JOIN ciudadanos c ON c.id_usuario = u.id_usuario
       LEFT JOIN instituciones i ON i.id_usuario = u.id_usuario
@@ -207,7 +213,7 @@ const UserModel = {
   },
 
   // Crear usuario con perfil de forma atómica y transaccional
-  async createWithProfile({ email, password, rol, estado = 'activo', id_ciudad = null, nombre, foto }) {
+  async createWithProfile({ email, password, rol, estado = 'activo', id_ciudad = null, nombre, foto, ciudad = null, provincia = null, zona = null }) {
     const bcrypt = require('bcryptjs');
     const hash = await bcrypt.hash(password, 10);
     const connection = await db.getConnection();
@@ -225,10 +231,21 @@ const UserModel = {
         const partes = (nombre || "").trim().split(" ");
         const nombreCiudadano   = partes[0] || (rol.toLowerCase() === 'admin' ? "Administrador" : "");
         const apellidoCiudadano = partes.slice(1).join(" ") || "";
+
+        let ciudadNombre = ciudad || null;
+        let provinciaNombre = provincia || null;
+        if (id_ciudad && (!ciudadNombre || !provinciaNombre)) {
+          const [cRows] = await connection.query(`SELECT nombre, provincia FROM ciudades WHERE id_ciudad = ?`, [id_ciudad]);
+          if (cRows && cRows[0]) {
+            ciudadNombre = ciudadNombre || cRows[0].nombre;
+            provinciaNombre = provinciaNombre || cRows[0].provincia;
+          }
+        }
+
         await connection.query(`
-          INSERT INTO ciudadanos (id_usuario, nombre, apellido, foto_perfil)
-          VALUES (?, ?, ?, ?)
-        `, [newUserId, nombreCiudadano, apellidoCiudadano, foto || null]);
+          INSERT INTO ciudadanos (id_usuario, nombre, apellido, ciudad, provincia, zona, foto_perfil)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [newUserId, nombreCiudadano, apellidoCiudadano, ciudadNombre, provinciaNombre, zona || null, foto || null]);
       }
 
       await connection.commit();

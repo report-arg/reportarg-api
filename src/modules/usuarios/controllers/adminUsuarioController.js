@@ -66,7 +66,7 @@ const userController = {
 
   async crear(req, res, next) {
     try {
-      const { email, password, rol, estado, nombre, foto } = req.body;
+      const { email, password, rol, estado, nombre, foto, id_ciudad, ciudad, provincia, zona } = req.body;
 
       // Validaciones básicas
       if (!email || !password) {
@@ -99,15 +99,32 @@ const userController = {
         return res.status(409).json({ ok: false, mensaje: 'El email ya está registrado' });
       }
 
+      const ciudadId = id_ciudad ? parseInt(id_ciudad, 10) : null;
+
       // Crear usuario y perfil de forma atómica y transaccional
       const id = await UserModel.createWithProfile({
         email,
         password,
         rol: rolNormalizado,
         estado: estado || 'activo',
+        id_ciudad: ciudadId,
         nombre,
         foto,
+        ciudad: ciudad || null,
+        provincia: provincia || null,
+        zona: zona || null,
       });
+
+      try {
+        const AuditoriaModel = require('../../admin/auditoriaModel');
+        await AuditoriaModel.registrar({
+          idActor: req.user?.id || null,
+          entidadTipo: 'usuario',
+          entidadId: Number(id),
+          accion: 'CREAR_USUARIO',
+          datosNuevos: { email, rol: rolNormalizado, estado: estado || 'activo', id_ciudad: ciudadId },
+        });
+      } catch (_) {}
 
       // Enviar email de bienvenida si está disponible el servicio
       try {

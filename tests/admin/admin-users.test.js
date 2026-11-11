@@ -44,7 +44,7 @@ describe('Módulo de Administración de Usuarios (ADMIN-01 — Etapa 3)', () => 
         return [[u]];
       }
       // 2. Consulta de UserModel.getById
-      if (typeof sql === 'string' && sql.includes('u.id_usuario AS id')) {
+      if (typeof sql === 'string' && sql.includes('WHERE u.id_usuario = ?')) {
         return [[userById || { id: 1, rol: 'admin', tipo_usuario: 'admin', estado: 'activo' }]];
       }
       return extra(sql, params);
@@ -67,7 +67,7 @@ describe('Módulo de Administración de Usuarios (ADMIN-01 — Etapa 3)', () => 
       expect(res.status).toBe(403);
     });
 
-    test('con token de admin → 200 y estructura paginada', async () => {
+    test('con token de admin → 200 y estructura paginada con ciudad y reclamos', async () => {
       mockDbQuery({
         extra: (sql) => {
           if (typeof sql === 'string' && sql.includes('SELECT COUNT(*) AS total')) {
@@ -75,8 +75,8 @@ describe('Módulo de Administración de Usuarios (ADMIN-01 — Etapa 3)', () => 
           }
           if (typeof sql === 'string' && sql.includes('u.id_usuario AS id')) {
             return [[
-              { id: 1, email: 'admin@reportarg.gob.ar', rol: 'admin', estado: 'activo', nombre: 'Admin General' },
-              { id: 2, email: 'juan@test.com', rol: 'ciudadano', estado: 'activo', nombre: 'Juan Pérez' },
+              { id: 1, email: 'admin@reportarg.gob.ar', rol: 'admin', estado: 'activo', nombre: 'Admin General', ciudad_nombre: 'Viale', provincia_nombre: 'Entre Ríos', reclamos_total: 0 },
+              { id: 2, email: 'juan@test.com', rol: 'ciudadano', estado: 'activo', nombre: 'Juan Pérez', ciudad_nombre: 'Viale', provincia_nombre: 'Entre Ríos', reclamos_total: 3 },
             ]];
           }
           return [[]];
@@ -93,6 +93,8 @@ describe('Módulo de Administración de Usuarios (ADMIN-01 — Etapa 3)', () => 
       expect(res.body.total).toBe(2);
       expect(res.body.pagina).toBe(1);
       expect(res.body.totalPaginas).toBe(1);
+      expect(res.body.data[1].ciudad_nombre).toBe('Viale');
+      expect(res.body.data[1].reclamos_total).toBe(3);
     });
   });
 
@@ -160,6 +162,42 @@ describe('Módulo de Administración de Usuarios (ADMIN-01 — Etapa 3)', () => 
       expect(res.status).toBe(201);
       expect(res.body.ok).toBe(true);
       expect(res.body.id).toBe(10);
+    });
+
+    test('crea usuario con id_ciudad exitosamente → 201 y vincula localidad', async () => {
+      mockDbQuery({
+        extra: (sql) => {
+          if (typeof sql === 'string' && sql.includes('SELECT id_usuario FROM usuarios WHERE email = ?')) {
+            return [[]];
+          }
+          if (typeof sql === 'string' && sql.includes('SELECT nombre, provincia FROM ciudades WHERE id_ciudad = ?')) {
+            return [[{ nombre: 'Viale', provincia: 'Entre Ríos' }]];
+          }
+          if (typeof sql === 'string' && sql.includes('INSERT INTO usuarios')) {
+            return [{ insertId: 11 }];
+          }
+          if (typeof sql === 'string' && sql.includes('INSERT INTO ciudadanos')) {
+            return [{ affectedRows: 1 }];
+          }
+          return [[]];
+        },
+      });
+
+      const res = await request(app)
+        .post('/api/admin/usuarios')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          nombre: 'Carlos Gómez',
+          email: 'carlos@test.com',
+          password: 'password123',
+          rol: 'ciudadano',
+          id_ciudad: 1,
+          estado: 'activo',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.id).toBe(11);
     });
 
     test('intento de alta con rol institucion → 400 y orienta al registro institucional formal', async () => {

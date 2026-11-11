@@ -426,8 +426,41 @@ Al trabajar sobre `ADMIN-01`:
   - `reportarg-api`: 20 suites y 244 tests pasando (`npm test`).
   - `report-arg`: 8 suites y 52 tests pasando (`npm test`).
 
+## Etapa 5 — Gestión de Usuarios y Estandarización de Controles UI (Completada)
+
+- **Rama (`reportarg-api` y `report-arg`):** `feature/ADMIN-01-reglas-negocio`
+- **Backend (`reportarg-api`):**
+  - **Listado administrativo ampliado (`GET /api/admin/usuarios`):**
+    - `UserModel.getAll` incorpora en la proyección SQL `ciudad_nombre` (`COALESCE(ciud.nombre, c.ciudad, i.ciudad)`), `provincia_nombre` (`COALESCE(ciud.provincia, c.provincia, i.provincia)`) y `reclamos_total` (`(SELECT COUNT(*) FROM reclamos r WHERE r.id_usuario = u.id_usuario)`), permitiendo supervisar la localidad asociada y el volumen de reclamos de cada usuario.
+  - **Alta atómica y transaccional (`POST /api/admin/usuarios`):**
+    - `UserModel.createWithProfile` y `adminUsuarioController.crear` aceptan `id_ciudad`, `ciudad`, `provincia` y `zona`.
+    - Si se especifica `id_ciudad`, se vincula en `usuarios.id_ciudad` y se obtienen los datos territoriales para persistir de manera consistente el perfil en `ciudadanos` dentro de la misma transacción atómica.
+    - Se registra el evento de auditoría `CREAR_USUARIO` en `admin_auditoria`.
+    - Se mantiene el bloqueo estricto para crear cuentas de rol `institucion` directamente desde usuarios, orientando al padrón institucional formal.
+  - **Inhabilitación / Rehabilitación con motivo de auditoría (`PATCH /api/admin/usuarios/:id/estado`):**
+    - Acepta motivo opcional/obligatorio para el registro de auditoría (`INHABILITAR_USUARIO` / `REHABILITAR_USUARIO`).
+    - Mantiene salvaguarda contra auto-inhabilitación administrativa.
+- **Frontend (`report-arg`):**
+  - **Estandarización de controles UI (`@/components/ui`):**
+    - `UsuarioFilterBar.jsx` estandarizado con `Input` y `Select` de `@/components/ui/` para búsqueda, rol (`Todos`, `admin`, `institucion`, `ciudadano`) y estado (`Todos`, `activo`, `inactivo`).
+    - `UsuarioStatusModal.jsx` estandarizado con `ConfirmModal` y `Textarea` de `@/components/ui/` para ingresar motivo de auditoría al inhabilitar una cuenta.
+    - Nuevo `UsuarioRoleModal.jsx` utilizando `Modal` y `Select` de `@/components/ui/`, permitiendo cambiar el rol entre `ciudadano` y `admin` con validaciones de auto-degradación y protección de cuentas institucionales.
+  - **Tabla de Gestión de Usuarios (`UsuarioTable.jsx`):**
+    - Incorpora las columnas **Localidad / Ciudad** (con icono territorial `MapPin`) y **Reclamos Creados** (contador `FileText`).
+    - Retiro del botón de enlace hacia `/admin/users/[id]/edit`.
+    - Incorpora botón **Cambiar rol** abriendo `UsuarioRoleModal` conectado a `PUT /api/admin/usuarios/:id/rol`.
+    - Conserva botón **Inhabilitar / Habilitar** conectado a `PATCH /api/admin/usuarios/:id/estado`.
+    - Vista Mobile adaptada con metadata territorial y de reclamos.
+  - **Alta de usuario enfocada (`UsuarioForm.jsx` y `/admin/users/new`):**
+    - Formulario refactorizado exclusivamente para el alta de nuevo usuario con controles `Input`, `Select`, `Button` de `@/components/ui/`.
+    - Selector dinámico de localidades de residencia cargado desde las ciudades activas de la plataforma.
+  - **Retiro de edición directa (`/admin/users/[id]/edit`):**
+    - Reemplazo de la vista de edición por pantalla informativa limpia que explica las razones de privacidad e integridad de datos y canaliza la administración mediante el cambio de rol y estado desde el padrón principal.
+- **Pruebas:**
+  - `reportarg-api`: 20 suites y 245 tests pasando (`npm test`).
+  - `report-arg`: 8 suites y 54 tests pasando (`npm test -- --runInBand`), linting limpio y build exitoso.
+
 ## Próximas etapas planificadas
 
-- **Etapa 5 (Siguiente):** Gestión de usuarios (`/admin/users` con ciudad y conteo de reclamos, alta corregida, retiro de edición manual `/admin/users/[id]/edit`) y estandarización de controles UI (`@/components/ui`).
-- **Etapa 6:** Rediseño del Dashboard administrativo (`/admin`) centrado en pendientes y salud de plataforma.
+- **Etapa 6 (Siguiente):** Rediseño del Dashboard administrativo (`/admin`) centrado en pendientes y salud de plataforma.
 
