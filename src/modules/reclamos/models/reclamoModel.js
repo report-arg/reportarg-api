@@ -531,14 +531,26 @@ const ClaimModel = {
     const [[row]] = await db.query(`SELECT COUNT(*) AS total,
       SUM(estado = ?) AS pendientes, SUM(estado = ?) AS enRevision,
       SUM(estado = ?) AS enProceso, SUM(estado = ?) AS resueltos,
-      SUM(estado = ?) AS cancelados FROM reclamos`, Object.values(CLAIM_STATUSES));
-    return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value || 0)]));
+      SUM(estado = ?) AS cancelados,
+      SUM(id_institucion IS NULL) AS sinAsignar,
+      DATEDIFF(NOW(), MIN(CASE WHEN estado = 'Pendiente' THEN fecha_creacion END)) AS pendienteMasAntiguoDias
+      FROM reclamos`, Object.values(CLAIM_STATUSES));
+    return Object.fromEntries(Object.entries(row || {}).map(([key, value]) => [key, Number(value || 0)]));
   },
   async getUltimos(limite = 5) {
     const { rows } = await this.getLista({ pagina: 1, limite });
     return rows;
   },
-  async getLista({ estado = null, busqueda = null, categoria = null, ciudad = null, pagina = 1, limite = 20 } = {}) {
+  async getLista({
+    estado = null,
+    busqueda = null,
+    categoria = null,
+    ciudad = null,
+    institucion = null,
+    anomalia = null,
+    pagina = 1,
+    limite = 20,
+  } = {}) {
     let where = 'WHERE 1=1';
     const params = [];
 
@@ -557,6 +569,19 @@ const ClaimModel = {
       params.push(ciudad);
     }
 
+    if (institucion && institucion !== 'Todas') {
+      if (String(institucion) === 'sin_asignar') {
+        where += ' AND r.id_institucion IS NULL';
+      } else if (Number.isInteger(Number(institucion)) && Number(institucion) > 0) {
+        where += ' AND r.id_institucion = ?';
+        params.push(Number(institucion));
+      }
+    }
+
+    if (anomalia === true || anomalia === '1' || anomalia === 'true') {
+      where += " AND (r.id_institucion IS NULL OR i.id_institucion IS NULL OR i.verificada = 0 OR i.status = 'rejected' OR usr_inst.activo = 0)";
+    }
+
     if (busqueda && String(busqueda).trim()) {
       const term = `%${String(busqueda).trim()}%`;
       if (/^\d+$/.test(String(busqueda).trim())) {
@@ -573,6 +598,7 @@ const ClaimModel = {
       FROM reclamos r
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
       LEFT JOIN instituciones i ON i.id_institucion = r.id_institucion
+      LEFT JOIN usuarios usr_inst ON usr_inst.id_usuario = i.id_usuario
       LEFT JOIN usuarios u ON u.id_usuario = r.id_usuario
       ${where}
     `;
@@ -598,11 +624,16 @@ const ClaimModel = {
         r.id_categoria,
         c.nombre AS categoriaNombre,
         i.nombre AS institucionNombre,
+        i.verificada AS institucionVerificada,
+        i.status AS institucionStatus,
+        usr_inst.activo AS institucionActiva,
         u.email AS autorNombre,
-        ciud.nombre AS ciudadNombre
+        ciud.nombre AS ciudadNombre,
+        ciud.provincia AS ciudadProvincia
       FROM reclamos r
       LEFT JOIN categorias c ON c.id_categoria = r.id_categoria
       LEFT JOIN instituciones i ON i.id_institucion = r.id_institucion
+      LEFT JOIN usuarios usr_inst ON usr_inst.id_usuario = i.id_usuario
       LEFT JOIN usuarios u ON u.id_usuario = r.id_usuario
       LEFT JOIN ciudades ciud ON ciud.id_ciudad = r.id_ciudad
       ${where}
@@ -611,7 +642,17 @@ const ClaimModel = {
     `;
 
     const [rows] = await db.query(dataSql, [...params, parsedLimite, offset]);
-    return { rows, total };
+    const mappedRows = (rows || []).map((r) => {
+      const sinInstitucion = r.id_institucion === null || (r.id_institucion !== undefined && !r.id_institucion);
+      const instNoVerificada = r.institucionVerificada !== undefined && r.institucionVerificada !== null && Number(r.institucionVerificada) === 0;
+      const instRechazada = r.institucionStatus === 'rejected';
+      const instSuspendida = r.institucionActiva !== undefined && r.institucionActiva !== null && Number(r.institucionActiva) === 0;
+      return {
+        ...r,
+        tieneAnomalia: Boolean(sinInstitucion || instNoVerificada || instRechazada || instSuspendida),
+      };
+    });
+    return { rows: mappedRows, total };
   },
   async getActividadMensual() {
     const [rows] = await db.query(`SELECT MONTH(fecha_creacion) AS mes, COUNT(*) AS total FROM reclamos

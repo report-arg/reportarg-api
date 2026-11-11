@@ -23,7 +23,7 @@ const reclamoController = {
   async categoriasParaReclamo(req, res, next) {
     try {
       const data = await CategoriaModel.getParaReclamo();
-      const id_ciudad = req.user?.id_ciudad || req.query.id_ciudad || 1;
+      const id_ciudad = req.query.id_ciudad || req.user?.id_ciudad || 1;
 
       const principal = await InstitucionModel.getPrincipalDeCiudad(id_ciudad);
       const nombrePrincipal = principal?.nombre || null;
@@ -52,7 +52,7 @@ const reclamoController = {
       const id_usuario = req.user.id;
       let id_ciudad = req.user.id_ciudad;
       if (req.user.role === ROLES.ADMIN) {
-        id_ciudad = req.body.id_ciudad;
+        id_ciudad = req.body.id_ciudad || req.user.id_ciudad;
       } else if (req.user.role === ROLES.CIUDADANO) {
         if (
           req.body.id_ciudad !== undefined &&

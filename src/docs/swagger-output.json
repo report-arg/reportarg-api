@@ -197,6 +197,20 @@
             }
           },
           {
+            "name": "institucion",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "anomalia",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "pagina",
             "in": "query",
             "schema": {

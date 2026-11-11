@@ -42,7 +42,7 @@ const claimController = {
 
   async lista(req, res, next) {
     try {
-      const { estado, busqueda, categoria, ciudad, pagina = 1, limite = 20 } = req.query;
+      const { estado, busqueda, categoria, ciudad, institucion, anomalia, pagina = 1, limite = 20 } = req.query;
       if (
         (estado && estado !== 'Todos' && !Object.values(CLAIM_STATUSES).includes(estado)) ||
         !/^\d+$/.test(String(pagina)) ||
@@ -59,6 +59,8 @@ const claimController = {
         busqueda: busqueda || null,
         categoria: categoria || null,
         ciudad: ciudad || null,
+        institucion: institucion || null,
+        anomalia: anomalia || null,
         pagina: parseInt(pagina, 10),
         limite: parseInt(limite, 10),
       });

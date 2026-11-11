@@ -200,4 +200,49 @@ describe('Módulo de Supervisión de Reclamos (ADMIN-01 — Etapa 5)', () => {
       expect(res.body.mensaje).toMatch(/identificador inválido/i);
     });
   });
+
+  describe('5. Filtros avanzados de supervisión (ciudad, categoría, institución y anomalías)', () => {
+    test('permite filtrar por anomalía y detecta reclamos sin institución o con institución inactiva', async () => {
+      mockDbQuery({
+        extra: (sql) => {
+          if (typeof sql === 'string' && sql.includes('COUNT(*) AS total')) {
+            return [[{ total: 2 }]];
+          }
+          if (typeof sql === 'string' && sql.includes('FROM reclamos r')) {
+            return [[
+              {
+                id: 30,
+                titulo: 'Reclamo sin institución asignada',
+                estado: 'Pendiente',
+                id_institucion: null,
+                ciudadNombre: 'Paraná',
+              },
+              {
+                id: 31,
+                titulo: 'Reclamo con institución suspendida',
+                estado: 'Pendiente',
+                id_institucion: 9,
+                institucionNombre: 'Cooperativa Suspendida',
+                institucionVerificada: 1,
+                institucionStatus: 'approved',
+                institucionActiva: 0,
+                ciudadNombre: 'Viale',
+              },
+            ]];
+          }
+          return [[]];
+        },
+      });
+
+      const res = await request(app)
+        .get('/api/admin/reclamos/lista?ciudad=1&categoria=2&institucion=sin_asignar&anomalia=true')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.data[0].tieneAnomalia).toBe(true);
+      expect(res.body.data[1].tieneAnomalia).toBe(true);
+    });
+  });
 });

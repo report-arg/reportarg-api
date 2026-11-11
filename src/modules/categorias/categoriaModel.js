@@ -4,31 +4,63 @@ const CategoryModel = {
 
   async getAll({ busqueda, tipo, estado } = {}) {
     let query = `
-      SELECT id_categoria AS id, id_categoria, codigo, nombre, descripcion, tipo, estado, orden
-      FROM categorias
+      SELECT
+        c.id_categoria AS id,
+        c.id_categoria,
+        c.codigo,
+        c.nombre,
+        c.descripcion,
+        c.tipo,
+        c.estado,
+        c.orden,
+        (
+          SELECT COUNT(DISTINCT inst_cat.id_institucion)
+          FROM institucion_categorias ic
+          INNER JOIN instituciones inst_cat ON inst_cat.id_institucion = ic.id_institucion
+          LEFT JOIN usuarios usr_cat ON usr_cat.id_usuario = inst_cat.id_usuario
+          WHERE ic.id_categoria = c.id_categoria
+            AND inst_cat.verificada = 1
+            AND inst_cat.status = 'approved'
+            AND (usr_cat.activo IS NULL OR usr_cat.activo = 1)
+        ) AS instituciones_especializadas_count,
+        (
+          SELECT COUNT(DISTINCT inst_cat.id_ciudad)
+          FROM institucion_categorias ic
+          INNER JOIN instituciones inst_cat ON inst_cat.id_institucion = ic.id_institucion
+          LEFT JOIN usuarios usr_cat ON usr_cat.id_usuario = inst_cat.id_usuario
+          WHERE ic.id_categoria = c.id_categoria
+            AND inst_cat.verificada = 1
+            AND inst_cat.status = 'approved'
+            AND (usr_cat.activo IS NULL OR usr_cat.activo = 1)
+        ) AS ciudades_especializadas_count
+      FROM categorias c
       WHERE 1=1
     `;
     const params = [];
 
     if (estado && ['activo', 'inactivo'].includes(estado)) {
-      query += ` AND estado = ?`;
+      query += ` AND c.estado = ?`;
       params.push(estado);
     }
 
     if (tipo && ['reclamo', 'comunicado', 'ambos'].includes(tipo)) {
-      query += ` AND tipo = ?`;
+      query += ` AND c.tipo = ?`;
       params.push(tipo);
     }
 
     if (busqueda && busqueda.trim()) {
       const term = `%${busqueda.trim()}%`;
-      query += ` AND (nombre LIKE ? OR codigo LIKE ? OR descripcion LIKE ?)`;
+      query += ` AND (c.nombre LIKE ? OR c.codigo LIKE ? OR c.descripcion LIKE ?)`;
       params.push(term, term, term);
     }
 
-    query += ` ORDER BY orden ASC, nombre ASC`;
+    query += ` ORDER BY c.orden ASC, c.nombre ASC`;
     const [rows] = await db.query(query, params);
-    return rows;
+    return (rows || []).map((r) => ({
+      ...r,
+      instituciones_especializadas_count: Number(r.instituciones_especializadas_count || 0),
+      ciudades_especializadas_count: Number(r.ciudades_especializadas_count || 0),
+    }));
   },
 
   async getById(id) {

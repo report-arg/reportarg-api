@@ -395,9 +395,39 @@ Al trabajar sobre `ADMIN-01`:
   - `reportarg-api`: 20 suites y 243 tests pasando (`npm test`).
   - `report-arg`: 8 suites y 50 tests pasando (`npm test -- --runInBand`).
 
+## Etapa 4 — Supervisión de Reclamos, Cobertura Institucional y Administrador en Comunidad (Completada)
+
+- **Rama (`reportarg-api` y `report-arg`):** `feature/ADMIN-01-reglas-negocio`
+- **Backend (`reportarg-api`):**
+  - **Supervisión avanzada de reclamos (`GET /api/admin/reclamos/lista`, `GET /api/admin/reclamos/stats`):**
+    - Métricas secundarias de supervisión ampliadas: `sinAsignar` (`SUM(id_institucion IS NULL)`) y `pendienteMasAntiguoDias` (`DATEDIFF(NOW(), MIN(CASE WHEN estado = 'Pendiente' THEN fecha_creacion END))`).
+    - Filtros completos soportados en `ClaimModel.getLista` y `adminReclamoController.lista`: estado, ciudad, categoría, institución (`id_institucion` o `'sin_asignar'`), texto libre y detección de anomalías (`anomalia=true`), detectando reportes huérfanos o con instituciones rechazadas/suspendidas/no verificadas.
+    - Exposición en cada reclamo de `ciudadNombre`, `ciudadProvincia`, `institucionVerificada`, `institucionStatus`, `institucionActiva` y flag computado `tieneAnomalia`.
+  - **Creación comunitaria para el Administrador y resolución territorial (`POST /api/reclamos`, `GET /api/reclamos/categorias`):**
+    - En `reclamoController.crear`: si `req.user.role === ROLES.ADMIN`, toma `id_ciudad = req.body.id_ciudad || req.user.id_ciudad`, permitiéndole registrar reportes directamente en la localidad activa seleccionada.
+    - En `reclamoController.categoriasParaReclamo`: prioriza `req.query.id_ciudad || req.user?.id_ciudad || 1` para resolver en tiempo real la institución responsable o principal de la ciudad activa consultada.
+  - **Cobertura institucional por categoría (`GET /api/admin/categorias`):**
+    - En `CategoryModel.getAll`: incorporadas subconsultas `instituciones_especializadas_count` y `ciudades_especializadas_count` para identificar cuántas entidades especializadas activas y verificadas atienden cada categoría.
+- **Frontend (`report-arg`):**
+  - **Panel de Supervisión de Reclamos (`/admin/reclamos`):**
+    - Tarjeta KPI de alerta **Sin Asignar** y antigüedad del pendiente más antiguo en `ReclamoStatsCards.jsx`.
+    - `ReclamoFilterBar.jsx` estandarizado con componentes `@/components/ui/` (`Input`, `Select`, `Button`) con filtros de Estado, Ciudad, Categoría, Institución y filtro directo de Anomalías.
+    - `ReclamoTable.jsx` muestra la ciudad del reclamo y badge de advertencia cuando la institución asignada está inactiva.
+    - `ReclamoReassignModal.jsx` estandarizado con `Select` y `Textarea` de `@/components/ui/`, filtrando instituciones elegibles en la misma ciudad y exigiendo motivo para auditoría.
+  - **Retiro de creación manual en `/admin` y habilitación comunitaria para Administradores:**
+    - Retiro de `/admin/reclamos/nuevo` de la barra de navegación (`AdminNavbar.jsx`) y reemplazo de la página por vista informativa que canaliza la creación hacia la Comunidad.
+    - `CiudadanoCiudadContext.jsx` y `CiudadanoCiudadPanel.jsx` adaptados para `userRole === "admin"`: cargan las ciudades activas, recuperan la ciudad activa de sesión y abren automáticamente el modal selector al ingresar si aún no se seleccionó localidad.
+    - `AppNavbar.jsx` permite al Administrador visualizar y cambiar su ciudad activa comunitaria.
+    - `/ciudadano/reclamos/nuevo` adaptado para que el Administrador registre reportes en la ciudad activa seleccionada enviando `id_ciudad`.
+  - **Cobertura institucional en `/admin/categories`:**
+    - `CategoriaPanel.jsx` incorpora la columna **Cobertura Institucional** mostrando la cantidad de instituciones especializadas asignadas y el respaldo por defecto de la Institución Principal de cada ciudad activa.
+    - `CategoriaFilterBar.jsx` estandarizado con `Input` y `Select` de `@/components/ui/`.
+- **Pruebas:**
+  - `reportarg-api`: 20 suites y 244 tests pasando (`npm test`).
+  - `report-arg`: 8 suites y 52 tests pasando (`npm test`).
+
 ## Próximas etapas planificadas
 
-- **Etapa 4 (Siguiente):** Supervisión de reclamos (filtros completos y anomalías de asignación en `/admin/reclamos`), cobertura institucional en `/admin/categories` y retiro de `/admin/reclamos/nuevo` + modal selector de ciudad para el admin al ingresar a `/ciudadano`.
-- **Etapa 5:** Gestión de usuarios (`/admin/users` con ciudad y conteo de reclamos, alta corregida, retiro de edición manual) y estandarización de controles UI (`@/components/ui`).
+- **Etapa 5 (Siguiente):** Gestión de usuarios (`/admin/users` con ciudad y conteo de reclamos, alta corregida, retiro de edición manual `/admin/users/[id]/edit`) y estandarización de controles UI (`@/components/ui`).
 - **Etapa 6:** Rediseño del Dashboard administrativo (`/admin`) centrado en pendientes y salud de plataforma.
 
