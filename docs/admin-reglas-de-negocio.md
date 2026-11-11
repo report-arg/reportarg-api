@@ -460,7 +460,39 @@ Al trabajar sobre `ADMIN-01`:
   - `reportarg-api`: 20 suites y 245 tests pasando (`npm test`).
   - `report-arg`: 8 suites y 54 tests pasando (`npm test -- --runInBand`), linting limpio y build exitoso.
 
-## Próximas etapas planificadas
+## Etapa 6 — Rediseño del Dashboard Administrativo y Salud de Plataforma (Completada)
 
-- **Etapa 6 (Siguiente):** Rediseño del Dashboard administrativo (`/admin`) centrado en pendientes y salud de plataforma.
+- **Rama (`reportarg-api` y `report-arg`):** `feature/ADMIN-01-reglas-negocio`
+- **Frontend (`report-arg`):**
+  - **Reorientación funcional del Dashboard (`/admin`):**
+    - Se elimina el total global de reclamos como KPI protagónico, reorientando el panel hacia la **salud operativa de la plataforma**, cobertura territorial y solicitudes administrativas pendientes.
+    - Carga en paralelo de métricas administrativas: `usuarios/stats`, `instituciones/stats`, `ciudades/stats`, `reclamos/stats`, `reclamos/ultimos`, `reclamos/por-categoria` y `reclamos/actividad-mensual`.
+  - **Banner de Atención Administrativa y Alertas Críticas (`DashboardAttentionBanner.jsx`):**
+    - Identifica y prioriza solicitudes de verificación institucional pendientes, ciudades activas sin institución principal (alerta crítica) y reclamos huérfanos sin entidad responsable asignada.
+    - Acciones directas con un clic hacia cada módulo con badges de conteo real.
+    - Estado positivo "Estado Operativo Normal" cuando la plataforma está completamente al día.
+  - **Tarjetas Ejecutivas de Salud de Plataforma (`DashboardKpis.jsx`):**
+    - **Pendientes Aprobación:** Alertas inmediatas de validación formal en `/admin/solicitudes`.
+    - **Ciudades Operativas:** Cobertura de localidades activas y advertencia si existen ciudades sin institución principal.
+    - **Instituciones:** Total en padrón, verificadas operativas y suspendidas.
+    - **Usuarios Activos:** Cuentas activas, total registrado y administradores.
+    - **Reclamos Totales (Secundario Contextual):** Desglose de resueltos, reclamos en gestión y alerta si existen reclamos sin asignar.
+  - **Supervisión de Estados y Accesos Rápidos (`DashboardStatusDistribution.jsx` y `DashboardQuickShortcuts.jsx`):**
+    - Resumen de resolución global y métricas secundarias de supervisión (antigüedad máxima de pendientes y reclamos sin asignar).
+    - Atajos rápidos con badges en tiempo real a Bandeja de Solicitudes, Gestión Territorial de Ciudades, Padrón de Instituciones, Supervisión de Reclamos y Catálogo de Categorías.
+- **Pruebas:**
+  - `reportarg-api`: 20 suites y 245 tests pasando (`npm test`).
+  - `report-arg`: 8 suites y 55 tests pasando (`npm test -- --runInBand`), linting limpio y build exitoso.
+
+---
+
+## Conclusión del Plan de 6 Etapas (`ADMIN-01`)
+
+Todas las 6 etapas han sido completadas, integradas, probadas y documentadas rigurosamente conforme a las reglas de negocio, el modelo territorial y la arquitectura de ReportARG:
+1. **Etapa 1:** Seguridad, Base de Datos, Auditoría e Integridad de Asignación.
+2. **Etapa 2:** Ciclo de Vida de Instituciones y Bandeja de Solicitudes.
+3. **Etapa 3:** Gestión Administrativa de Ciudades e Institución Principal.
+4. **Etapa 4:** Supervisión de Reclamos, Cobertura Institucional y Administrador en Comunidad.
+5. **Etapa 5:** Gestión de Usuarios y Estandarización de Controles UI (`@/components/ui`).
+6. **Etapa 6:** Rediseño del Dashboard Administrativo y Salud de Plataforma.
 
