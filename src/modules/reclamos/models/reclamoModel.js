@@ -527,14 +527,20 @@ const ClaimModel = {
     } finally { connection.release(); }
   },
 
-  async getStats() {
+  async getStats(ciudad = null) {
+    let where = '';
+    const params = [...Object.values(CLAIM_STATUSES)];
+    if (ciudad) {
+      where = ' WHERE id_ciudad = ?';
+      params.push(ciudad);
+    }
     const [[row]] = await db.query(`SELECT COUNT(*) AS total,
       SUM(estado = ?) AS pendientes, SUM(estado = ?) AS enRevision,
       SUM(estado = ?) AS enProceso, SUM(estado = ?) AS resueltos,
       SUM(estado = ?) AS cancelados,
       SUM(id_institucion IS NULL) AS sinAsignar,
       DATEDIFF(NOW(), MIN(CASE WHEN estado = 'Pendiente' THEN fecha_creacion END)) AS pendienteMasAntiguoDias
-      FROM reclamos`, Object.values(CLAIM_STATUSES));
+      FROM reclamos${where}`, params);
     return Object.fromEntries(Object.entries(row || {}).map(([key, value]) => [key, Number(value || 0)]));
   },
   async getUltimos(limite = 5) {

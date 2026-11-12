@@ -39,8 +39,15 @@ const userController = {
 
   async listar(req, res, next) {
     try {
-      const { busqueda, rol, estado, pagina = 1, limite = 20 } = req.query;
-      const result = await UserModel.getAll({ busqueda, rol, estado, pagina, limite });
+      const { busqueda, rol, estado, id_ciudad, pagina = 1, limite = 20 } = req.query;
+      const result = await UserModel.getAll({
+        busqueda,
+        rol,
+        estado,
+        id_ciudad: id_ciudad ? parseInt(id_ciudad, 10) : null,
+        pagina,
+        limite,
+      });
       res.json({
         ok: true,
         data: result.rows,

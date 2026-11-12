@@ -6,7 +6,8 @@ const claimController = {
 
   async stats(req, res, next) {
     try {
-      const data = await ClaimModel.getStats();
+      const { ciudad } = req.query || {};
+      const data = await ClaimModel.getStats(ciudad);
       res.json({ ok: true, data });
     } catch (err) {
       next(err);

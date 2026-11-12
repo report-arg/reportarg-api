@@ -53,10 +53,14 @@ const UserModel = {
 
 
   // Listar todos con filtros opcionales y paginación
-  async getAll({ busqueda, rol, estado, pagina = 1, limite = 20 } = {}) {
+  async getAll({ busqueda, rol, estado, id_ciudad, pagina = 1, limite = 20 } = {}) {
     let where = 'WHERE COALESCE(u.email_verified, 1) = 1';
     const params = [];
 
+    if (id_ciudad && Number.isSafeInteger(Number(id_ciudad)) && Number(id_ciudad) > 0) {
+      where += ` AND u.id_ciudad = ?`;
+      params.push(Number(id_ciudad));
+    }
     if (busqueda) {
       where += ` AND (u.email LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ? OR i.nombre LIKE ?)`;
       params.push(`%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`);

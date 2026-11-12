@@ -1,4 +1,5 @@
 const CategoryModel = require('./categoriaModel');
+const InstitutionModel = require('../instituciones/institucionModel');
 
 const categoryController = {
 
@@ -131,6 +132,48 @@ const categoryController = {
       if (err.message && err.message.includes('No se puede eliminar')) {
         return res.status(409).json({ ok: false, mensaje: err.message });
       }
+      next(err);
+    }
+  },
+
+  async obtenerAsignacion(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { id_ciudad } = req.query;
+      if (!id_ciudad) {
+        return res.status(400).json({ ok: false, mensaje: 'El parámetro id_ciudad es obligatorio.' });
+      }
+      const instCategoria = await InstitutionModel.getPorCategoriaYCiudad(id, id_ciudad);
+      if (instCategoria) {
+        return res.json({
+          ok: true,
+          data: {
+            tipo: 'especializada',
+            institucion: instCategoria,
+            detalle: `Atendida por institución especializada (${instCategoria.nombre})`,
+          },
+        });
+      }
+      const instPrincipal = await InstitutionModel.getPrincipalDeCiudad(id_ciudad);
+      if (instPrincipal) {
+        return res.json({
+          ok: true,
+          data: {
+            tipo: 'principal',
+            institucion: instPrincipal,
+            detalle: `Derivada por respaldo a la institución principal (${instPrincipal.nombre})`,
+          },
+        });
+      }
+      return res.json({
+        ok: true,
+        data: {
+          tipo: 'ninguna',
+          institucion: null,
+          detalle: 'Sin institución responsable configurada en esta localidad',
+        },
+      });
+    } catch (err) {
       next(err);
     }
   },
