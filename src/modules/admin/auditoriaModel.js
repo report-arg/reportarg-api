@@ -58,6 +58,7 @@ const AuditoriaModel = {
       `SELECT
          a.id_auditoria AS id,
          a.id_actor,
+         COALESCE(CONCAT(c.nombre, ' ', c.apellido), u.email, 'Administrador') AS actor_nombre,
          u.email AS actor_email,
          u.tipo_usuario AS actor_rol,
          a.entidad_tipo,
@@ -69,6 +70,7 @@ const AuditoriaModel = {
          a.fecha_creacion
        FROM admin_auditoria a
        LEFT JOIN usuarios u ON u.id_usuario = a.id_actor
+       LEFT JOIN ciudadanos c ON c.id_usuario = a.id_actor
        WHERE a.entidad_tipo = ? AND a.entidad_id = ?
        ORDER BY a.fecha_creacion DESC, a.id_auditoria DESC
        LIMIT ?`,
@@ -112,6 +114,7 @@ const AuditoriaModel = {
       `SELECT
          a.id_auditoria AS id,
          a.id_actor,
+         COALESCE(CONCAT(c.nombre, ' ', c.apellido), u.email, 'Administrador') AS actor_nombre,
          u.email AS actor_email,
          u.tipo_usuario AS actor_rol,
          a.entidad_tipo,
@@ -123,6 +126,7 @@ const AuditoriaModel = {
          a.fecha_creacion
        FROM admin_auditoria a
        LEFT JOIN usuarios u ON u.id_usuario = a.id_actor
+       LEFT JOIN ciudadanos c ON c.id_usuario = a.id_actor
        ${where}
        ORDER BY a.fecha_creacion DESC, a.id_auditoria DESC
        LIMIT ? OFFSET ?`,

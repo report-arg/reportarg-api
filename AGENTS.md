@@ -2,6 +2,15 @@
 
 Este archivo se aplica a todo el repositorio. Antes de editar, revisá la solicitud, el estado de la rama, los archivos relacionados y la documentación de dominio. No ejecutes migraciones o cambios sobre una base de datos compartida como parte de una comprobación rutinaria.
 
+## Principios fundamentales de desarrollo para agentes
+
+1. **Consulta obligatoria ante decisiones:** Si se presenta una bifurcación técnica, funcional o de diseño en la implementación, **preguntar siempre al usuario** y presentar las opciones claras con sus pros y contras. **NUNCA asumir, adivinar ni elegir por cuenta propia**.
+2. **Economía de código y síntesis:** Los cambios deben ser los mínimos y necesarios. Si un bloque o archivo de 200 líneas puede resolverse con 50 líneas legibles, declarativas y limpias, se debe reescribir y simplificar. Menor cantidad de código bien estructurado reduce drásticamente la superficie de fallos.
+3. **Alcance estricto (no hacer de más):** Cada línea que cambia debe estar estrictamente justificada por lo pedido por el usuario. Queda prohibido aplicar modificaciones cosméticas colaterales o refactorizaciones fuera de alcance.
+4. **Desarrollo responsive y accesible:** Toda interfaz o ajuste visual debe ser 100% responsive (mobile, tablet, desktop) y accesible sin desbordamientos horizontales.
+5. **Modularidad y responsabilidad única:** Evitar archivos monolíticos. Diseñar módulos, funciones y componentes desacoplados, reutilizables y con una única responsabilidad clara.
+6. **Verificación y no regresión:** Comprobar siempre que los cambios pasen las pruebas correspondientes y no rompan contratos vigentes ni flujos existentes antes de dar por finalizada la tarea.
+
 ## Contexto y fuentes
 
 La API usa Express, CommonJS y MySQL mediante `mysql2`. El código está organizado respetando la siguiente jerarquía de arquitectura en capas: **Routes → Controllers → Services (cuando corresponda) → Models → DB**. Para lógica e infraestructura transversal se utilizan `src/services/`, `src/middlewares/` y `src/config/`.
